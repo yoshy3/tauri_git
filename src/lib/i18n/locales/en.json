@@ -44,6 +44,7 @@
     "targetLabel": "Delete target",
     "inputLabel": "Branch name",
     "inputHint": "Enter {branch} exactly to enable deletion.",
+    "forceOption": "Force delete even if the branch is not fully merged",
     "nameMismatch": "The branch name does not match.",
     "delete": "Delete Branch",
     "deleting": "Deleting...",

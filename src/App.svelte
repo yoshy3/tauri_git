@@ -1,7 +1,7 @@
 <script>
   import { onMount } from "svelte";
   import { invoke } from "@tauri-apps/api/core";
-  import { open } from "@tauri-apps/plugin-dialog";
+  import { confirm, open } from "@tauri-apps/plugin-dialog";
   import { _ } from "svelte-i18n";
   import { get } from "svelte/store";
   import TopBar from "./lib/components/TopBar.svelte";
@@ -31,6 +31,7 @@
   let deleteDialogOpen = false;
   let deleteBranchNameDraft = "";
   let deleteTargetRef = null;
+  let deleteForceEnabled = false;
 
   const topActions = ["Fetch", "Pull", "Push", "Stash"];
   const implementedTopActions = ["Fetch", "Pull", "Push", "Stash"];
@@ -58,6 +59,7 @@
     deleteDialogOpen = false;
     deleteBranchNameDraft = "";
     deleteTargetRef = null;
+    deleteForceEnabled = false;
   }
 
   function closeBranchMenu() {
@@ -322,6 +324,7 @@
     closeBranchMenu();
     deleteTargetRef = ref;
     deleteBranchNameDraft = "";
+    deleteForceEnabled = false;
     deleteDialogOpen = true;
   }
 
@@ -344,6 +347,7 @@
         branchName: deleteTargetRef.name,
         branchKind: deleteTargetRef.kind,
         remoteName: deleteTargetRef.remoteName ?? null,
+        forceDelete: deleteForceEnabled,
       });
       if (selectedRef?.key === deleteTargetRef.key) {
         selectedRef = null;
@@ -640,6 +644,13 @@
         </label>
 
         <p class="dialog-helper">{t("branchDelete.inputHint", { branch: deleteTargetRef.displayName })}</p>
+
+        {#if deleteTargetRef.kind === "local_branch"}
+          <label class="dialog-checkbox">
+            <input type="checkbox" bind:checked={deleteForceEnabled} disabled={loading} />
+            <span>{t("branchDelete.forceOption")}</span>
+          </label>
+        {/if}
 
         <div class="dialog-actions">
           <button class="dialog-button dialog-button-muted" type="button" on:click={resetDeleteDialog} disabled={loading}>

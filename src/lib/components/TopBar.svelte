@@ -13,6 +13,10 @@
   function actionKey(action) {
     return `topbar.${action.toLowerCase()}`;
   }
+
+  function iconType(action) {
+    return action.toLowerCase();
+  }
 </script>
 
 <header class="topbar">
@@ -33,31 +37,75 @@
           disabled={!repository || loading || !implementedActions.includes(action)}
           on:click={() => onAction(action)}
         >
+          <span class="button-icon" aria-hidden="true">
+            {#if iconType(action) === "fetch"}
+              <svg viewBox="0 0 16 16" fill="none">
+                <path d="M8 2.5v8" />
+                <path d="M5.25 7.75 8 10.5l2.75-2.75" />
+                <path d="M3 12.5h10" />
+              </svg>
+            {:else if iconType(action) === "pull"}
+              <svg viewBox="0 0 16 16" fill="none">
+                <path d="M8 2.5v8" />
+                <path d="M5.25 7.75 8 10.5l2.75-2.75" />
+                <path d="M4 5.25a4 4 0 0 1 8 0" />
+              </svg>
+            {:else if iconType(action) === "push"}
+              <svg viewBox="0 0 16 16" fill="none">
+                <path d="M8 13.5v-8" />
+                <path d="M10.75 8.25 8 5.5 5.25 8.25" />
+                <path d="M4 10.75a4 4 0 0 0 8 0" />
+              </svg>
+            {:else if iconType(action) === "stash"}
+              <svg viewBox="0 0 16 16" fill="none">
+                <path d="M3 5.25 8 2.5l5 2.75-5 2.75-5-2.75Z" />
+                <path d="M3 8.25 8 11l5-2.75" />
+                <path d="M3 11.25 8 14l5-2.75" />
+              </svg>
+            {/if}
+          </span>
           {activeAction === action ? $_("topbar.syncing") : $_(actionKey(action))}
         </button>
       {/each}
       <button class:active={activeAction === "Refresh"} class="toolbar-button" on:click={onRefresh} disabled={!repository || loading}>
+        <span class="button-icon" aria-hidden="true">
+          <svg viewBox="0 0 16 16" fill="none">
+            <path d="M12.75 6A5 5 0 1 0 13 8" />
+            <path d="M10.75 3.25h2v2" />
+          </svg>
+        </span>
         {activeAction === "Refresh" ? $_("topbar.syncing") : $_("topbar.refresh")}
       </button>
     </div>
 
-    <div class="locale-switcher" aria-label={$_("topbar.language")}>
+    <div class="locale-area">
+      <span class="locale-label">{$_("topbar.language")}:</span>
+      <div class="locale-switcher" aria-label={$_("topbar.language")}>
       <button
         class:locale-active={$locale === "en"}
         class="locale-button"
         type="button"
         on:click={() => setAppLocale("en")}
+        title="English"
+        aria-label="English"
       >
-        EN
+        <span class="button-icon" aria-hidden="true">
+          <span class="locale-glyph">A</span>
+        </span>
       </button>
       <button
         class:locale-active={$locale === "ja"}
         class="locale-button"
         type="button"
         on:click={() => setAppLocale("ja")}
+        title="日本語"
+        aria-label="日本語"
       >
-        JA
+        <span class="button-icon" aria-hidden="true">
+          <span class="locale-glyph locale-glyph-ja">日</span>
+        </span>
       </button>
+      </div>
     </div>
   </div>
 </header>
@@ -117,6 +165,9 @@
   }
 
   .toolbar-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
     background: transparent;
     border: 0;
     color: #8aa0b8;
@@ -148,13 +199,29 @@
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.02);
   }
 
+  .locale-area {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .locale-label {
+    color: #8aa0b8;
+    font-size: 0.74rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+  }
+
   .locale-button {
-    min-width: 40px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 34px;
     border: 0;
     border-radius: 8px;
     background: transparent;
     color: #8aa0b8;
-    padding: 8px 10px;
+    padding: 8px;
     font-size: 0.72rem;
     font-weight: 700;
     letter-spacing: 0.08em;
@@ -169,6 +236,40 @@
     background: rgba(32, 84, 138, 0.22);
     color: #f2f7fb;
     box-shadow: inset 0 -2px 0 #4da0ff;
+  }
+
+  .button-icon {
+    width: 14px;
+    height: 14px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .button-icon svg {
+    width: 14px;
+    height: 14px;
+    stroke: currentColor;
+    stroke-width: 1.6;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  .locale-glyph {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 14px;
+    height: 14px;
+    font-size: 0.82rem;
+    font-weight: 800;
+    line-height: 1;
+    letter-spacing: 0;
+  }
+
+  .locale-glyph-ja {
+    font-size: 0.76rem;
   }
 
   @media (max-width: 860px) {

@@ -44,6 +44,7 @@
     "targetLabel": "削除対象",
     "inputLabel": "ブランチ名を入力",
     "inputHint": "{branch} を正確に入力すると削除できます。",
+    "forceOption": "マージされていなくても強制的に削除する",
     "nameMismatch": "入力したブランチ名が一致しません。",
     "delete": "ブランチを削除",
     "deleting": "削除中...",

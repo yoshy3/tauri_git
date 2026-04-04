@@ -148,6 +148,7 @@ fn delete_branch(
     branch_name: String,
     branch_kind: String,
     remote_name: Option<String>,
+    force_delete: bool,
 ) -> Result<GitStatusResponse, String> {
     let mut repository = open_repo(&path)?;
     delete_repository_branch(
@@ -155,6 +156,7 @@ fn delete_branch(
         &branch_name,
         &branch_kind,
         remote_name.as_deref(),
+        force_delete,
     )?;
     build_repository_status(&mut repository)
 }
@@ -590,6 +592,7 @@ fn delete_repository_branch(
     branch_name: &str,
     branch_kind: &str,
     remote_name: Option<&str>,
+    force_delete: bool,
 ) -> Result<(), String> {
     let branch_name = branch_name.trim();
     if branch_name.is_empty() {
@@ -610,7 +613,10 @@ fn delete_repository_branch(
                 return Err("cannot delete the currently checked out branch".to_string());
             }
 
-            command.arg("branch").arg("-d").arg(branch_name);
+            command
+                .arg("branch")
+                .arg(if force_delete { "-D" } else { "-d" })
+                .arg(branch_name);
         }
         "remote_branch" => {
             let remote_name = remote_name
