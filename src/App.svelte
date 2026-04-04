@@ -22,8 +22,8 @@
   const historyBatchSize = 100;
   const graphLaneSpacing = 14;
   const graphPadding = 10;
-  const graphRowHeight = 30;
-  const graphCenterY = 15;
+  const graphRowHeight = 32;
+  const graphCenterY = 16;
   const graphOverlap = 3;
   const graphCurveInset = 5;
   const graphPalette = ["#67b3ff", "#ffb454", "#7be495", "#f7768e", "#c792ea", "#7dcfff"];
@@ -539,7 +539,7 @@
         {#if repository && historyCommits.length > 0}
           <ul class="history-rows">
             {#each historyGraphRows as commit, index}
-              <li>
+              <li class:muted-history-row={!commit.on_current_branch}>
                 <div class="graph-cell">
                   <svg
                     class="graph-svg"
@@ -569,16 +569,20 @@
                 </div>
 
                 <div class="subject-cell">
-                  <strong>{commit.summary}</strong>
-                  {#if index === 0}
+                  {#if commit.labels.length > 0}
                     <div class="history-tags">
-                      <span>{repository.branch}</span>
-                      {#if commit.parent_ids.length > 1}
-                        <span>merge</span>
-                      {/if}
-                      <span>HEAD</span>
+                      {#each commit.labels as label}
+                        <span
+                          class:history-tag-local={label.scope === "local"}
+                          class:history-tag-remote={label.scope === "remote"}
+                          class:history-tag-current={label.is_current}
+                        >
+                          {label.name}
+                        </span>
+                      {/each}
                     </div>
                   {/if}
+                  <strong>{commit.summary}</strong>
                 </div>
 
                 <div class="author-cell">
@@ -1101,12 +1105,16 @@
     padding: 0 12px;
     border-bottom: 1px solid rgba(120, 148, 177, 0.04);
     transition: background 120ms ease;
-    height: 30px;
+    height: 32px;
     box-sizing: border-box;
   }
 
   .history-rows li:hover {
     background: rgba(255, 255, 255, 0.02);
+  }
+
+  .history-rows li.muted-history-row {
+    background: rgba(255, 255, 255, 0.01);
   }
 
   .graph-cell {
@@ -1136,12 +1144,20 @@
   .subject-cell strong {
     display: block;
     color: #eef5fb;
-    line-height: 1;
+    line-height: 1.2;
     font-size: 0.78rem;
+    font-weight: 500;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
     flex: 1;
+  }
+
+  .muted-history-row .subject-cell strong,
+  .muted-history-row .author-cell,
+  .muted-history-row .hash-cell,
+  .muted-history-row .date-cell {
+    color: #627388;
   }
 
   .history-tags {
@@ -1149,15 +1165,41 @@
     gap: 3px;
     margin-top: 0;
     flex-shrink: 0;
+    align-items: center;
   }
 
   .history-tags span {
-    padding: 1px 5px;
+    padding: 1px 7px;
     border-radius: 999px;
     background: rgba(43, 71, 98, 0.72);
     color: #c7d9eb;
-    font-size: 0.58rem;
-    text-transform: uppercase;
+    font-size: 0.68rem;
+    letter-spacing: 0.02em;
+    white-space: nowrap;
+  }
+
+  .muted-history-row .history-tags span {
+    background: rgba(43, 71, 98, 0.32);
+    color: #8ca1b8;
+  }
+
+  .history-tags span.history-tag-local {
+    background: rgba(144, 92, 14, 0.22);
+    color: #ffd48a;
+    box-shadow: inset 0 0 0 1px rgba(218, 146, 33, 0.35);
+  }
+
+  .history-tags span.history-tag-remote {
+    background: rgba(60, 74, 94, 0.5);
+    color: #d4dde7;
+    box-shadow: inset 0 0 0 1px rgba(114, 138, 167, 0.2);
+  }
+
+  .history-tags span.history-tag-current {
+    background: rgba(164, 102, 11, 0.28);
+    color: #fff4d9;
+    box-shadow: inset 0 0 0 1px rgba(241, 170, 55, 0.75);
+    font-weight: 700;
   }
 
   .author-cell {
@@ -1187,6 +1229,11 @@
     color: #fff;
     font-size: 0.5rem;
     font-weight: 700;
+  }
+
+  .muted-history-row .avatar {
+    background: linear-gradient(135deg, #44566d, #738399);
+    color: #dbe4ed;
   }
 
   .hash-cell {
@@ -1458,7 +1505,7 @@
     }
 
     .history-rows li {
-      height: 28px;
+      height: 30px;
       padding: 0 10px;
     }
 

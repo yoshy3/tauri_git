@@ -1,5 +1,6 @@
 use git2::{Repository, Signature, Status, StatusOptions};
 use serde::Serialize;
+use std::collections::HashMap;
 use std::path::PathBuf;
 
 #[derive(Serialize)]
@@ -28,6 +29,15 @@ struct GitCommitSummary {
     author: String,
     committed_at: String,
     parent_ids: Vec<String>,
+    on_current_branch: bool,
+    labels: Vec<GitRefLabel>,
+}
+
+#[derive(Clone, Serialize)]
+struct GitRefLabel {
+    name: String,
+    scope: String,
+    is_current: bool,
 }
 
 #[derive(Serialize)]
@@ -258,13 +268,17 @@ fn load_commit_history_chunk(
     offset: usize,
     limit: usize,
 ) -> Result<GitCommitHistoryChunk, String> {
+    let current_head_oid = repository.head().ok().and_then(|head| head.target());
+    let current_branch_name = repository
+        .head()
+        .ok()
+        .and_then(|head| head.shorthand().map(ToOwned::to_owned));
+    let reference_labels = load_reference_labels(repository, current_branch_name.as_deref())?;
     let mut revwalk = repository
         .revwalk()
         .map_err(|error| format!("コミット履歴を読み込めませんでした: {}", error.message()))?;
 
-    revwalk
-        .push_head()
-        .map_err(|error| format!("HEAD を起点に履歴を辿れませんでした: {}", error.message()))?;
+    push_history_refs(repository, &mut revwalk)?;
     revwalk.set_sorting(git2::Sort::TOPOLOGICAL)
         .map_err(|error| format!("コミット履歴の並び替えに失敗しました: {}", error.message()))?;
 
@@ -292,6 +306,9 @@ fn load_commit_history_chunk(
             .map(|datetime| datetime.format("%Y-%m-%dT%H:%M:%S").to_string())
             .unwrap_or_else(|| "unknown time".to_string());
         let parent_ids = commit.parent_ids().map(|parent_id| parent_id.to_string()).collect();
+        let on_current_branch = current_head_oid
+            .map(|head_oid| head_oid == oid || repository.graph_descendant_of(head_oid, oid).unwrap_or(false))
+            .unwrap_or(false);
 
         commits.push(GitCommitSummary {
             oid: oid.to_string(),
@@ -300,10 +317,126 @@ fn load_commit_history_chunk(
             author: commit.author().name().unwrap_or("Unknown").to_string(),
             committed_at,
             parent_ids,
+            on_current_branch,
+            labels: reference_labels.get(&oid.to_string()).cloned().unwrap_or_default(),
         });
     }
 
     Ok(GitCommitHistoryChunk { commits, has_more })
+}
+
+fn load_reference_labels(
+    repository: &Repository,
+    current_branch_name: Option<&str>,
+) -> Result<HashMap<String, Vec<GitRefLabel>>, String> {
+    let mut labels_by_oid = HashMap::new();
+
+    append_reference_labels(
+        repository,
+        "refs/heads/*",
+        "refs/heads/",
+        "local",
+        current_branch_name,
+        &mut labels_by_oid,
+    )?;
+    append_reference_labels(
+        repository,
+        "refs/remotes/origin/*",
+        "refs/remotes/",
+        "remote",
+        None,
+        &mut labels_by_oid,
+    )?;
+
+    for labels in labels_by_oid.values_mut() {
+        labels.sort_by(|left, right| {
+            right
+                .is_current
+                .cmp(&left.is_current)
+                .then_with(|| left.scope.cmp(&right.scope))
+                .then_with(|| left.name.cmp(&right.name))
+        });
+    }
+
+    Ok(labels_by_oid)
+}
+
+fn append_reference_labels(
+    repository: &Repository,
+    pattern: &str,
+    prefix: &str,
+    scope: &str,
+    current_branch_name: Option<&str>,
+    labels_by_oid: &mut HashMap<String, Vec<GitRefLabel>>,
+) -> Result<(), String> {
+    let references = match repository.references_glob(pattern) {
+        Ok(references) => references,
+        Err(error) if error.code() == git2::ErrorCode::NotFound => return Ok(()),
+        Err(error) => {
+            return Err(format!(
+                "参照 {} を読み込めませんでした: {}",
+                pattern,
+                error.message()
+            ))
+        }
+    };
+
+    for reference_result in references {
+        let reference = reference_result
+            .map_err(|error| format!("参照 {} の読み込みに失敗しました: {}", pattern, error.message()))?;
+        let Some(oid) = reference.target() else {
+            continue;
+        };
+        let Some(name) = reference.name() else {
+            continue;
+        };
+        if scope == "remote" && name.ends_with("/HEAD") {
+            continue;
+        }
+
+        let display_name = name.strip_prefix(prefix).unwrap_or(name).to_string();
+        let is_current = scope == "local" && current_branch_name == Some(display_name.as_str());
+
+        labels_by_oid
+            .entry(oid.to_string())
+            .or_default()
+            .push(GitRefLabel {
+                name: display_name,
+                scope: scope.to_string(),
+                is_current,
+            });
+    }
+
+    Ok(())
+}
+
+fn push_history_refs(
+    _repository: &Repository,
+    revwalk: &mut git2::Revwalk<'_>,
+) -> Result<(), String> {
+    let mut pushed_any = false;
+
+    for pattern in ["refs/heads/*", "refs/remotes/origin/*"] {
+        match revwalk.push_glob(pattern) {
+            Ok(()) => pushed_any = true,
+            Err(error) if error.code() == git2::ErrorCode::NotFound => {}
+            Err(error) => {
+                return Err(format!(
+                    "履歴参照 {} を追加できませんでした: {}",
+                    pattern,
+                    error.message()
+                ))
+            }
+        }
+    }
+
+    if !pushed_any {
+        revwalk
+            .push_head()
+            .map_err(|error| format!("HEAD を起点に履歴を辿れませんでした: {}", error.message()))?;
+    }
+
+    Ok(())
 }
 
 fn load_local_branches(repository: &Repository) -> Result<Vec<String>, String> {
