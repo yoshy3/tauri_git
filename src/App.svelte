@@ -20,6 +20,13 @@
   const navItems = ["Branches", "Remotes", "Tags", "Stashes"];
   const lastRepositoryKey = "tauri-git:last-repository-path";
   const historyBatchSize = 100;
+  const graphLaneSpacing = 14;
+  const graphPadding = 10;
+  const graphRowHeight = 30;
+  const graphCenterY = 15;
+  const graphOverlap = 3;
+  const graphCurveInset = 5;
+  const graphPalette = ["#67b3ff", "#ffb454", "#7be495", "#f7768e", "#c792ea", "#7dcfff"];
 
   function resetHistoryState() {
     historyRequestId += 1;
@@ -185,6 +192,162 @@
     rightPaneExpanded = !rightPaneExpanded;
   }
 
+  function dedupeLaneEntries(entries) {
+    const seen = new Set();
+    const result = [];
+
+    entries.forEach((entry) => {
+      if (seen.has(entry.oid)) {
+        return;
+      }
+
+      seen.add(entry.oid);
+      result.push(entry);
+    });
+
+    return result;
+  }
+
+  function buildVerticalPath(x, startY, endY) {
+    return `M ${x} ${startY} L ${x} ${endY}`;
+  }
+
+  function buildLaneTransitionPath(startX, startY, endX, endY) {
+    if (startX === endX) {
+      return buildVerticalPath(startX, startY, endY);
+    }
+
+    const direction = endY > startY ? 1 : -1;
+    const turnStartY = startY + graphCurveInset * direction;
+    const turnEndY = endY - graphCurveInset * direction;
+    const midY = (turnStartY + turnEndY) / 2;
+
+    return [
+      `M ${startX} ${startY}`,
+      `L ${startX} ${turnStartY}`,
+      `C ${startX} ${midY} ${endX} ${midY} ${endX} ${turnEndY}`,
+      `L ${endX} ${endY}`,
+    ].join(" ");
+  }
+
+  function buildGraphRows(commits) {
+    let lanes = [];
+    let maxLaneCount = 1;
+    let colorCursor = 0;
+    const rows = [];
+
+    function nextColor() {
+      const color = graphPalette[colorCursor % graphPalette.length];
+      colorCursor += 1;
+      return color;
+    }
+
+    commits.forEach((commit, rowIndex) => {
+      const existingIndex = lanes.findIndex((lane) => lane.oid === commit.oid);
+      const inserted = existingIndex === -1;
+      const before = inserted
+        ? [...lanes, { oid: commit.oid, color: nextColor() }]
+        : lanes.map((lane) => ({ ...lane }));
+      const laneIndex = inserted ? before.length - 1 : existingIndex;
+      const nodeLane = before[laneIndex];
+
+      const after = before.map((lane) => ({ ...lane }));
+      if (commit.parent_ids.length === 0) {
+        after.splice(laneIndex, 1);
+      } else {
+        after[laneIndex] = { oid: commit.parent_ids[0], color: nodeLane.color };
+        for (let index = 1; index < commit.parent_ids.length; index += 1) {
+          const parentId = commit.parent_ids[index];
+          const existingParentLane = before.find((lane) => lane.oid === parentId);
+          after.splice(laneIndex + index, 0, {
+            oid: parentId,
+            color: existingParentLane?.color ?? nextColor(),
+          });
+        }
+      }
+
+      const dedupedAfter = dedupeLaneEntries(after);
+      const laneCount = Math.max(before.length, dedupedAfter.length, 1);
+      maxLaneCount = Math.max(maxLaneCount, laneCount);
+      const lines = [];
+      const topY = -graphOverlap;
+      const bottomY = graphRowHeight + graphOverlap;
+      const nodeX = graphPadding + laneIndex * graphLaneSpacing;
+      const nodeColor = nodeLane.color;
+
+      before.forEach((lane, index) => {
+        if (index === laneIndex) {
+          return;
+        }
+
+        const currentX = graphPadding + index * graphLaneSpacing;
+        const stroke = lane.color;
+        if (commit.parent_ids.includes(lane.oid)) {
+          lines.push({
+            d: buildLaneTransitionPath(currentX, topY, nodeX, graphCenterY),
+            stroke,
+          });
+          return;
+        }
+
+        const nextIndex = dedupedAfter.findIndex((nextLane) => nextLane.oid === lane.oid);
+
+        if (nextIndex === -1) {
+          lines.push({
+            d: buildVerticalPath(currentX, topY, graphCenterY),
+            stroke,
+          });
+          return;
+        }
+
+        const nextX = graphPadding + nextIndex * graphLaneSpacing;
+        lines.push({
+          d: buildLaneTransitionPath(currentX, topY, nextX, bottomY),
+          stroke,
+        });
+      });
+
+      if (!inserted) {
+        lines.push({
+          d: buildVerticalPath(nodeX, topY, graphCenterY),
+          stroke: nodeColor,
+        });
+      }
+
+      commit.parent_ids.forEach((parentId) => {
+        const nextIndex = dedupedAfter.findIndex((lane) => lane.oid === parentId);
+        if (nextIndex === -1) {
+          return;
+        }
+        const nextX = graphPadding + nextIndex * graphLaneSpacing;
+        const nextLaneColor = dedupedAfter[nextIndex].color;
+        lines.push({
+          d:
+            nextX === nodeX
+              ? buildVerticalPath(nodeX, graphCenterY, bottomY)
+              : buildLaneTransitionPath(nodeX, graphCenterY, nextX, bottomY),
+          stroke: nextLaneColor,
+        });
+      });
+
+      lanes = dedupedAfter;
+
+      rows.push({
+        ...commit,
+        graphLines: lines,
+        graphNodeX: nodeX,
+        graphNodeColor: nodeColor,
+        graphIsHead: rowIndex === 0,
+      });
+    });
+
+    const graphWidth = maxLaneCount * graphLaneSpacing + graphPadding * 2;
+    return rows.map((row) => ({
+      ...row,
+      graphWidth,
+    }));
+  }
+
   async function loadCommitHistory(path) {
     const requestId = historyRequestId + 1;
     historyRequestId = requestId;
@@ -242,6 +405,11 @@
   });
 
   $: changedEntries = repository ? repository.entries : [];
+  $: historyGraphRows = buildGraphRows(historyCommits);
+  $: historyGraphWidth = Math.max(
+    historyGraphRows.length > 0 ? historyGraphRows[0].graphWidth : 0,
+    56,
+  );
 </script>
 
 <svelte:head>
@@ -359,7 +527,7 @@
         <div class="banner error-banner">{error}</div>
       {/if}
 
-      <section class="history-table">
+      <section class="history-table" style={`--graph-column-width: ${historyGraphWidth}px;`}>
         <div class="history-head">
           <span>Graph</span>
           <span>Subject</span>
@@ -370,21 +538,44 @@
 
         {#if repository && historyCommits.length > 0}
           <ul class="history-rows">
-            {#each historyCommits as commit, index}
+            {#each historyGraphRows as commit, index}
               <li>
                 <div class="graph-cell">
-                  <span class="graph-line"></span>
-                  <span class:graph-node-main={index === 0} class="graph-node"></span>
-                  {#if index < historyCommits.length - 1}
-                    <span class="graph-tail"></span>
-                  {/if}
+                  <svg
+                    class="graph-svg"
+                    viewBox={`0 0 ${commit.graphWidth} ${graphRowHeight}`}
+                    width={commit.graphWidth}
+                    height={graphRowHeight}
+                    preserveAspectRatio="xMinYMid meet"
+                    aria-hidden="true"
+                  >
+                    {#each commit.graphLines as line}
+                      <path
+                        d={line.d}
+                        stroke={line.stroke}
+                        stroke-width="2"
+                        fill="none"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                      />
+                    {/each}
+                    <circle
+                      cx={commit.graphNodeX}
+                      cy={graphCenterY}
+                      r={commit.graphIsHead ? 4.5 : 3.5}
+                      fill={commit.graphNodeColor}
+                    />
+                  </svg>
                 </div>
 
                 <div class="subject-cell">
                   <strong>{commit.summary}</strong>
                   {#if index === 0}
                     <div class="history-tags">
-                      <span>main</span>
+                      <span>{repository.branch}</span>
+                      {#if commit.parent_ids.length > 1}
+                        <span>merge</span>
+                      {/if}
                       <span>HEAD</span>
                     </div>
                   {/if}
@@ -887,15 +1078,15 @@
   .history-head,
   .history-rows li {
     display: grid;
-    grid-template-columns: 72px minmax(0, 1.5fr) minmax(140px, 0.8fr) 92px 132px;
+    grid-template-columns: var(--graph-column-width, 108px) minmax(0, 1.5fr) minmax(140px, 0.8fr) 92px 132px;
     gap: 14px;
     align-items: center;
   }
 
   .history-head {
-    padding: 8px 14px;
+    padding: 4px 12px;
     color: #60788f;
-    font-size: 0.68rem;
+    font-size: 0.64rem;
     text-transform: uppercase;
     letter-spacing: 0.1em;
     border-bottom: 1px solid rgba(120, 148, 177, 0.06);
@@ -907,12 +1098,11 @@
   }
 
   .history-rows li {
-    padding: 8px 14px;
+    padding: 0 12px;
     border-bottom: 1px solid rgba(120, 148, 177, 0.04);
     transition: background 120ms ease;
-    height: 40px;
+    height: 30px;
     box-sizing: border-box;
-    overflow: hidden;
   }
 
   .history-rows li:hover {
@@ -921,59 +1111,33 @@
 
   .graph-cell {
     position: relative;
-    height: 24px;
+    height: 100%;
     display: flex;
     align-items: center;
-    justify-content: center;
+    justify-content: flex-start;
+    overflow: visible;
   }
 
-  .graph-line,
-  .graph-tail {
-    position: absolute;
-    width: 2px;
-    background: rgba(110, 143, 176, 0.38);
-    left: calc(50% - 1px);
-  }
-
-  .graph-line {
-    top: -8px;
-    height: 10px;
-  }
-
-  .graph-tail {
-    top: 16px;
-    bottom: -8px;
-  }
-
-  .graph-node {
-    width: 8px;
-    height: 8px;
-    border-radius: 999px;
-    background: #ffb54a;
-    z-index: 1;
-    box-shadow: 0 0 0 4px rgba(255, 181, 74, 0.08);
-  }
-
-  .graph-node.graph-node-main {
-    width: 10px;
-    height: 10px;
-    background: #66b0ff;
-    box-shadow: 0 0 0 4px rgba(102, 176, 255, 0.1);
+  .graph-svg {
+    display: block;
+    overflow: visible;
+    flex: 0 0 auto;
   }
 
   .subject-cell {
     min-width: 0;
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
     overflow: hidden;
+    height: 100%;
   }
 
   .subject-cell strong {
     display: block;
     color: #eef5fb;
     line-height: 1;
-    font-size: 0.89rem;
+    font-size: 0.78rem;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -982,27 +1146,28 @@
 
   .history-tags {
     display: flex;
-    gap: 6px;
+    gap: 3px;
     margin-top: 0;
     flex-shrink: 0;
   }
 
   .history-tags span {
-    padding: 3px 7px;
+    padding: 1px 5px;
     border-radius: 999px;
     background: rgba(43, 71, 98, 0.72);
     color: #c7d9eb;
-    font-size: 0.68rem;
+    font-size: 0.58rem;
     text-transform: uppercase;
   }
 
   .author-cell {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
     min-width: 0;
-    font-size: 0.84rem;
+    font-size: 0.74rem;
     overflow: hidden;
+    height: 100%;
   }
 
   .author-cell span:last-child {
@@ -1012,15 +1177,15 @@
   }
 
   .avatar {
-    width: 22px;
-    height: 22px;
+    width: 15px;
+    height: 15px;
     flex-shrink: 0;
     border-radius: 999px;
     display: grid;
     place-items: center;
     background: linear-gradient(135deg, #2b6aa8, #70b8ff);
     color: #fff;
-    font-size: 0.68rem;
+    font-size: 0.5rem;
     font-weight: 700;
   }
 
@@ -1028,8 +1193,9 @@
     display: flex;
     align-items: center;
     color: #7990a7;
-    font-size: 0.76rem;
+    font-size: 0.68rem;
     overflow: hidden;
+    height: 100%;
   }
 
   .hash-cell span {
@@ -1043,8 +1209,9 @@
     display: flex;
     align-items: center;
     color: #7990a7;
-    font-size: 0.76rem;
+    font-size: 0.68rem;
     overflow: hidden;
+    height: 100%;
   }
 
   .date-cell span {
@@ -1287,12 +1454,12 @@
 
     .history-head,
     .history-rows li {
-      grid-template-columns: 48px minmax(0, 1fr);
+      grid-template-columns: 84px minmax(0, 1fr);
     }
 
     .history-rows li {
-      height: 36px;
-      padding: 6px 10px;
+      height: 28px;
+      padding: 0 10px;
     }
 
     .history-head span:nth-child(3),

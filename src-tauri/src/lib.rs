@@ -22,10 +22,12 @@ struct GitStatusResponse {
 
 #[derive(Serialize)]
 struct GitCommitSummary {
+    oid: String,
     id: String,
     summary: String,
     author: String,
     committed_at: String,
+    parent_ids: Vec<String>,
 }
 
 #[derive(Serialize)]
@@ -263,7 +265,7 @@ fn load_commit_history_chunk(
     revwalk
         .push_head()
         .map_err(|error| format!("HEAD を起点に履歴を辿れませんでした: {}", error.message()))?;
-    revwalk.set_sorting(git2::Sort::TIME)
+    revwalk.set_sorting(git2::Sort::TOPOLOGICAL)
         .map_err(|error| format!("コミット履歴の並び替えに失敗しました: {}", error.message()))?;
 
     let mut commits = Vec::new();
@@ -289,12 +291,15 @@ fn load_commit_history_chunk(
         let committed_at = chrono::DateTime::from_timestamp(timestamp, 0)
             .map(|datetime| datetime.format("%Y-%m-%dT%H:%M:%S").to_string())
             .unwrap_or_else(|| "unknown time".to_string());
+        let parent_ids = commit.parent_ids().map(|parent_id| parent_id.to_string()).collect();
 
         commits.push(GitCommitSummary {
+            oid: oid.to_string(),
             id: oid.to_string().chars().take(7).collect(),
             summary: commit.summary().unwrap_or("(no summary)").to_string(),
             author: commit.author().name().unwrap_or("Unknown").to_string(),
             committed_at,
+            parent_ids,
         });
     }
 
