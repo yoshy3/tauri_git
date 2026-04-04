@@ -311,12 +311,15 @@
   .collapsed-pane .pane-toggle {
     height: 100%;
     min-height: 160px;
-    padding: 14px 8px;
-    writing-mode: vertical-rl;
-    text-orientation: mixed;
+    padding: 14px 6px;
+    writing-mode: horizontal-tb;
+    text-orientation: initial;
     justify-self: stretch;
+    display: flex;
+    align-items: center;
     justify-content: center;
     border-radius: 10px;
+    overflow: hidden;
   }
 
   .pane-toggle.attention {
@@ -328,6 +331,14 @@
 
   .pane-toggle-label {
     display: inline-block;
+  }
+
+  .collapsed-pane .pane-toggle-label {
+    line-height: 1;
+    white-space: nowrap;
+    transform: rotate(90deg);
+    transform-origin: center;
+    letter-spacing: 0.08em;
   }
 
   .changes-panel,
