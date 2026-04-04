@@ -1,5 +1,6 @@
 <script>
   import { _ } from "svelte-i18n";
+  import BranchTreeNode from "./BranchTreeNode.svelte";
 
   export let repository = null;
   export let loading = false;
@@ -7,6 +8,8 @@
   export let stashBusyAction = "";
   export let onSelectRepository = () => {};
   export let onSelectStash = () => {};
+  export let onCheckoutLocalBranch = () => {};
+  export let onCheckoutRemoteBranch = () => {};
   export let onCancelSelectedStash = () => {};
   export let onApplySelectedStash = () => {};
   export let onPopSelectedStash = () => {};
@@ -47,10 +50,49 @@
     return String(value || "").toLowerCase().includes(sidebarFilterTerm);
   }
 
+  function buildBranchTree(branchNames) {
+    const root = [];
+
+    branchNames.forEach((branchName) => {
+      const segments = String(branchName || "")
+        .split("/")
+        .filter(Boolean);
+
+      if (segments.length === 0) {
+        return;
+      }
+
+      let level = root;
+      let pathSoFar = "";
+
+      segments.forEach((segment, index) => {
+        pathSoFar = pathSoFar ? `${pathSoFar}/${segment}` : segment;
+        const isBranch = index === segments.length - 1;
+        let node = level.find((entry) => entry.label === segment && entry.isBranch === isBranch);
+
+        if (!node) {
+          node = {
+            key: pathSoFar,
+            label: segment,
+            fullName: pathSoFar,
+            isBranch,
+            children: [],
+          };
+          level.push(node);
+        }
+
+        level = node.children;
+      });
+    });
+
+    return root;
+  }
+
   $: sidebarFilterTerm = sidebarFilter.trim().toLowerCase();
   $: filteredLocalBranches = repository
     ? repository.local_branches.filter((branchName) => matchesSidebarFilter(branchName))
     : [];
+  $: localBranchTree = buildBranchTree(filteredLocalBranches);
   $: filteredRemoteGroups = repository
     ? repository.remote_groups
         .map((group) => {
@@ -62,6 +104,7 @@
             return {
               ...group,
               branches,
+              tree: buildBranchTree(branches),
             };
           }
 
@@ -90,7 +133,6 @@
 
 <aside class="sidebar">
   <div class="sidebar-toolbar">
-    <button class="sidebar-tool sidebar-tool-active" type="button" disabled>{$_("sidebar.refs")}</button>
     <button class="sidebar-tool" type="button" on:click={onSelectRepository} disabled={loading}>
       {loading ? $_("sidebar.opening") : $_("sidebar.open")}
     </button>
@@ -133,14 +175,15 @@
 
         {#if sidebarSections.branches}
           {#if filteredLocalBranches.length > 0}
-            <ul class="tree-list tree-section-children">
-              {#each filteredLocalBranches as branchName}
-                <li class:tree-item-current={branchName === repository.branch} class="tree-item">
-                  <span class="tree-item-icon tree-item-branch"></span>
-                  <span class="tree-item-label">{branchName}</span>
-                </li>
-              {/each}
-            </ul>
+            <div class="tree-section-children">
+              <BranchTreeNode
+                nodes={localBranchTree}
+                {loading}
+                currentBranch={repository.branch}
+                {onCheckoutLocalBranch}
+                {onCheckoutRemoteBranch}
+              />
+            </div>
           {:else}
             <p class="tree-empty">{$_("sidebar.branchesEmpty")}</p>
           {/if}
@@ -171,17 +214,16 @@
                     </summary>
 
                     {#if group.branches.length > 0}
-                      <ul class="tree-list tree-nested-list">
-                        {#each group.branches as branchName}
-                          <li
-                            class:tree-item-current={group.name === "origin" && branchName === repository.branch}
-                            class="tree-item tree-item-nested"
-                          >
-                            <span class="tree-item-icon tree-item-branch tree-item-branch-muted"></span>
-                            <span class="tree-item-label">{branchName}</span>
-                          </li>
-                        {/each}
-                      </ul>
+                      <div class="tree-nested-list">
+                        <BranchTreeNode
+                          nodes={group.tree}
+                          {loading}
+                          currentBranch={repository.branch}
+                          remoteName={group.name}
+                          {onCheckoutLocalBranch}
+                          {onCheckoutRemoteBranch}
+                        />
+                      </div>
                     {:else}
                       <p class="tree-empty tree-empty-nested">{$_("sidebar.matchingBranchesEmpty")}</p>
                     {/if}
@@ -321,12 +363,11 @@
   }
 
   .sidebar-toolbar {
-    display: grid;
-    grid-template-columns: 1fr auto;
-    gap: 8px;
+    display: flex;
   }
 
   .sidebar-tool {
+    width: 100%;
     border: 1px solid rgba(120, 148, 177, 0.12);
     border-radius: 10px;
     background: rgba(12, 23, 35, 0.82);
@@ -336,12 +377,6 @@
     font-weight: 700;
     letter-spacing: 0.08em;
     text-transform: uppercase;
-  }
-
-  .sidebar-tool-active {
-    background: rgba(18, 37, 56, 0.9);
-    color: #eef5fb;
-    box-shadow: inset 0 -2px 0 #4da0ff;
   }
 
   .sidebar-summary,
@@ -542,10 +577,13 @@
     cursor: pointer;
   }
 
-  .tree-item.tree-item-current {
-    background: rgba(255, 255, 255, 0.08);
-    color: #f8fbff;
-    font-weight: 700;
+  .tree-item-button:hover:enabled {
+    background: rgba(255, 255, 255, 0.04);
+    color: #eef5fb;
+  }
+
+  .tree-item-button:disabled {
+    cursor: default;
   }
 
   .tree-item-stack {
@@ -563,25 +601,16 @@
     margin-top: 1px;
   }
 
-  .tree-item-branch {
-    background: linear-gradient(135deg, #77b7ff, #4a9cff);
-    box-shadow: 0 0 0 1px rgba(110, 172, 234, 0.14);
-  }
-
-  .tree-item-branch-muted {
-    opacity: 0.62;
+  .tree-item-tag {
+    border-radius: 4px;
+    background: linear-gradient(135deg, #f1c56f, #f09a42);
+    box-shadow: 0 0 0 1px rgba(239, 169, 72, 0.14);
   }
 
   .tree-item-remote {
     border-radius: 3px;
     background: linear-gradient(135deg, #8f98a3, #c0cad6);
     box-shadow: 0 0 0 1px rgba(150, 163, 179, 0.14);
-  }
-
-  .tree-item-tag {
-    border-radius: 4px;
-    background: linear-gradient(135deg, #f1c56f, #f09a42);
-    box-shadow: 0 0 0 1px rgba(239, 169, 72, 0.14);
   }
 
   .tree-item-stash {
@@ -595,8 +624,14 @@
     box-shadow: 0 0 0 1px rgba(88, 178, 187, 0.14);
   }
 
-  .tree-item-label,
   .tree-item-detail {
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .tree-item-label {
     min-width: 0;
     white-space: nowrap;
     overflow: hidden;

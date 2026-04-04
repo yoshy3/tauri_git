@@ -239,6 +239,32 @@
     rightPaneTab = "commit";
   }
 
+  async function checkoutBranch(branchName, remoteName = null) {
+    if (!repository) {
+      error = t("errors.openRepositoryFirst");
+      return;
+    }
+
+    loading = true;
+    error = "";
+
+    try {
+      repository = await invoke("checkout_branch", {
+        path: repository.repo_path,
+        branchName,
+        remoteName,
+      });
+      selectedStashIndex = null;
+      rightPaneExpanded = false;
+      rightPaneTab = "commit";
+      void loadCommitHistory(repository.repo_path);
+    } catch (message) {
+      error = String(message);
+    } finally {
+      loading = false;
+    }
+  }
+
   async function applySelectedStash(index) {
     if (!repository) {
       error = t("errors.openRepositoryFirst");
@@ -376,6 +402,8 @@
       stashBusyAction={stashBusyAction}
       onSelectRepository={selectRepository}
       onSelectStash={(index) => (selectedStashIndex = index)}
+      onCheckoutLocalBranch={(branchName) => checkoutBranch(branchName)}
+      onCheckoutRemoteBranch={(remoteName, branchName) => checkoutBranch(branchName, remoteName)}
       onCancelSelectedStash={() => (selectedStashIndex = null)}
       onApplySelectedStash={applySelectedStash}
       onPopSelectedStash={popSelectedStash}

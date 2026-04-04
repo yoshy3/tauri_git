@@ -111,6 +111,17 @@ fn push_current_branch(path: String) -> Result<GitStatusResponse, String> {
 }
 
 #[tauri::command]
+fn checkout_branch(
+    path: String,
+    branch_name: String,
+    remote_name: Option<String>,
+) -> Result<GitStatusResponse, String> {
+    let mut repository = open_repo(&path)?;
+    checkout_repository_branch(&repository, &branch_name, remote_name.as_deref())?;
+    build_repository_status(&mut repository)
+}
+
+#[tauri::command]
 fn stash_changes(
     path: String,
     message: Option<String>,
@@ -382,6 +393,73 @@ fn push_current_branch_to_origin(repository: &Repository) -> Result<(), String> 
         };
 
         return Err(format!("git push failed: {detail}"));
+    }
+
+    Ok(())
+}
+
+fn checkout_repository_branch(
+    repository: &Repository,
+    branch_name: &str,
+    remote_name: Option<&str>,
+) -> Result<(), String> {
+    let branch_name = branch_name.trim();
+    if branch_name.is_empty() {
+        return Err("branch name is empty".to_string());
+    }
+
+    let current_branch = repository
+        .head()
+        .ok()
+        .and_then(|head| head.shorthand().map(ToOwned::to_owned));
+
+    if remote_name.is_none() && current_branch.as_deref() == Some(branch_name) {
+        return Ok(());
+    }
+
+    let repo_root = repository_root(repository)?;
+    let mut command = Command::new("git");
+    command.current_dir(repo_root);
+
+    match remote_name {
+        Some(remote) if !remote.trim().is_empty() => {
+            let remote_branch = format!("{remote}/{branch_name}");
+            let has_local_branch = repository
+                .find_branch(branch_name, git2::BranchType::Local)
+                .is_ok();
+
+            command.arg("checkout");
+            if has_local_branch {
+                command.arg(branch_name);
+            } else {
+                command
+                    .arg("-b")
+                    .arg(branch_name)
+                    .arg("--track")
+                    .arg(remote_branch);
+            }
+        }
+        _ => {
+            command.arg("checkout").arg(branch_name);
+        }
+    }
+
+    let output = command
+        .output()
+        .map_err(|error| format!("Failed to run git checkout: {}", error))?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+        let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
+        let detail = if !stderr.is_empty() {
+            stderr
+        } else if !stdout.is_empty() {
+            stdout
+        } else {
+            "git checkout failed without output".to_string()
+        };
+
+        return Err(format!("git checkout failed: {detail}"));
     }
 
     Ok(())
@@ -899,6 +977,7 @@ pub fn run() {
             fetch_origin,
             pull_current_branch,
             push_current_branch,
+            checkout_branch,
             stash_changes,
             apply_stash,
             pop_stash,

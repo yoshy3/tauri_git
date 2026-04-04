@@ -36,8 +36,8 @@
           {activeAction === action ? $_("topbar.syncing") : $_(actionKey(action))}
         </button>
       {/each}
-      <button class="toolbar-button active" on:click={onRefresh} disabled={!repository || loading}>
-        {loading ? $_("topbar.syncing") : $_("topbar.refresh")}
+      <button class:active={activeAction === "Refresh"} class="toolbar-button" on:click={onRefresh} disabled={!repository || loading}>
+        {activeAction === "Refresh" ? $_("topbar.syncing") : $_("topbar.refresh")}
       </button>
     </div>
 
