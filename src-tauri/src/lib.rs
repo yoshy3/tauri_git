@@ -1,7 +1,8 @@
-use git2::{Repository, Signature, Status, StatusOptions};
+use git2::{Cred, FetchOptions, RemoteCallbacks, Repository, Signature, Status, StatusOptions};
 use serde::Serialize;
 use std::collections::{BTreeMap, HashMap};
 use std::path::PathBuf;
+use std::process::Command;
 
 #[derive(Serialize)]
 struct GitStatusEntry {
@@ -33,6 +34,7 @@ struct GitRemoteGroup {
 
 #[derive(Serialize)]
 struct GitStashEntry {
+    index: usize,
     name: String,
     message: String,
 }
@@ -87,6 +89,38 @@ fn commit_all(path: String, message: String) -> Result<GitStatusResponse, String
 }
 
 #[tauri::command]
+fn fetch_origin(path: String) -> Result<GitStatusResponse, String> {
+    let mut repository = open_repo(&path)?;
+    fetch_default_remote(&repository)?;
+    build_repository_status(&mut repository)
+}
+
+#[tauri::command]
+fn stash_changes(
+    path: String,
+    message: Option<String>,
+    selected_paths: Vec<String>,
+) -> Result<GitStatusResponse, String> {
+    let mut repository = open_repo(&path)?;
+    create_stash(&mut repository, message.as_deref(), &selected_paths)?;
+    build_repository_status(&mut repository)
+}
+
+#[tauri::command]
+fn apply_stash(path: String, index: usize) -> Result<GitStatusResponse, String> {
+    let mut repository = open_repo(&path)?;
+    apply_stash_entry(&mut repository, index)?;
+    build_repository_status(&mut repository)
+}
+
+#[tauri::command]
+fn pop_stash(path: String, index: Option<usize>) -> Result<GitStatusResponse, String> {
+    let mut repository = open_repo(&path)?;
+    pop_stash_entry(&mut repository, index.unwrap_or(0))?;
+    build_repository_status(&mut repository)
+}
+
+#[tauri::command]
 fn get_commit_history_chunk(
     path: String,
     offset: usize,
@@ -108,11 +142,7 @@ fn open_repo(path: &str) -> Result<Repository, String> {
 }
 
 fn build_repository_status(repository: &mut Repository) -> Result<GitStatusResponse, String> {
-    let repo_root = repository
-        .workdir()
-        .or_else(|| repository.path().parent())
-        .ok_or_else(|| "リポジトリのルートパスを解決できませんでした。".to_string())?
-        .to_path_buf();
+    let repo_root = repository_root(repository)?;
     let repo_name = repo_root
         .file_name()
         .and_then(|name| name.to_str())
@@ -249,6 +279,161 @@ fn create_commit(repository: &Repository, message: &str) -> Result<(), String> {
     Ok(())
 }
 
+fn fetch_default_remote(repository: &Repository) -> Result<(), String> {
+    let mut remote = repository
+        .find_remote("origin")
+        .map_err(|error| format!("origin リモートを開けませんでした: {}", error.message()))?;
+
+    let mut callbacks = RemoteCallbacks::new();
+    callbacks.credentials(|url, username_from_url, _allowed_types| {
+        let config = repository.config()?;
+
+        Cred::credential_helper(&config, url, username_from_url).or_else(|_| {
+            username_from_url
+                .map(Cred::ssh_key_from_agent)
+                .unwrap_or_else(|| Err(git2::Error::from_str("利用できる認証情報がありません。")))
+        })
+    });
+
+    let mut fetch_options = FetchOptions::new();
+    fetch_options.remote_callbacks(callbacks);
+
+    remote
+        .fetch(&[] as &[&str], Some(&mut fetch_options), None)
+        .map_err(|error| format!("Fetch に失敗しました: {}", error.message()))?;
+
+    Ok(())
+}
+
+fn create_stash(
+    repository: &mut Repository,
+    message: Option<&str>,
+    selected_paths: &[String],
+) -> Result<(), String> {
+    let mut status_options = StatusOptions::new();
+    status_options
+        .include_untracked(true)
+        .recurse_untracked_dirs(true)
+        .include_ignored(false)
+        .renames_head_to_index(true)
+        .renames_index_to_workdir(true);
+
+    let statuses = repository
+        .statuses(Some(&mut status_options))
+        .map_err(|error| format!("stash 対象を確認できませんでした: {}", error.message()))?;
+
+    if statuses.is_empty() {
+        return Err("stash する変更がありません。".to_string());
+    }
+    drop(statuses);
+
+    if selected_paths.is_empty() {
+        return Err("stash 対象のファイルを選択してください。".to_string());
+    }
+
+    let repo_root = repository_root(repository)?;
+    let stash_message = match message.map(str::trim) {
+        Some("") | None => "tauri-git stash",
+        Some(text) => text,
+    };
+
+    let mut command = Command::new("git");
+    command
+        .current_dir(repo_root)
+        .arg("stash")
+        .arg("push")
+        .arg("--include-untracked")
+        .arg("-m")
+        .arg(stash_message)
+        .arg("--");
+
+    for path in selected_paths {
+        command.arg(path);
+    }
+
+    let output = command
+        .output()
+        .map_err(|error| format!("stash コマンドを実行できませんでした: {}", error))?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+        let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
+        let detail = if !stderr.is_empty() {
+            stderr
+        } else if !stdout.is_empty() {
+            stdout
+        } else {
+            "詳細なエラーを取得できませんでした。".to_string()
+        };
+
+        return Err(format!("stash に失敗しました: {detail}"));
+    }
+
+    Ok(())
+}
+
+fn apply_stash_entry(repository: &mut Repository, index: usize) -> Result<(), String> {
+    match repository.stash_apply(index, None) {
+        Ok(()) => {
+            reset_index_to_head(repository)?;
+            Ok(())
+        }
+        Err(error) if error.code() == git2::ErrorCode::NotFound => {
+            Err("適用できる stash がありません。".to_string())
+        }
+        Err(error) => Err(format!("stash apply に失敗しました: {}", error.message())),
+    }
+}
+
+fn pop_stash_entry(repository: &mut Repository, index: usize) -> Result<(), String> {
+    match repository.stash_pop(index, None) {
+        Ok(()) => {
+            reset_index_to_head(repository)?;
+            Ok(())
+        }
+        Err(error) if error.code() == git2::ErrorCode::NotFound => {
+            Err("適用できる stash がありません。".to_string())
+        }
+        Err(error) => Err(format!("stash pop に失敗しました: {}", error.message())),
+    }
+}
+
+fn reset_index_to_head(repository: &Repository) -> Result<(), String> {
+    let mut index = repository
+        .index()
+        .map_err(|error| format!("インデックスを開けませんでした: {}", error.message()))?;
+
+    if let Ok(head) = repository.head() {
+        if let Ok(tree) = head.peel_to_tree() {
+            index
+                .read_tree(&tree)
+                .map_err(|error| format!("インデックスを HEAD に戻せませんでした: {}", error.message()))?;
+        } else {
+            index
+                .clear()
+                .map_err(|error| format!("インデックスを初期化できませんでした: {}", error.message()))?;
+        }
+    } else {
+        index
+            .clear()
+            .map_err(|error| format!("インデックスを初期化できませんでした: {}", error.message()))?;
+    }
+
+    index
+        .write()
+        .map_err(|error| format!("インデックスを書き込めませんでした: {}", error.message()))?;
+
+    Ok(())
+}
+
+fn repository_root(repository: &Repository) -> Result<PathBuf, String> {
+    repository
+        .workdir()
+        .or_else(|| repository.path().parent())
+        .ok_or_else(|| "リポジトリのルートパスを解決できませんでした。".to_string())
+        .map(|path| path.to_path_buf())
+}
+
 fn tree_is_unchanged(
     new_tree: &git2::Tree<'_>,
     parent_commit: Option<&git2::Commit<'_>>,
@@ -282,7 +467,7 @@ fn index_status_code(status: Status) -> char {
 
 fn worktree_status_code(status: Status) -> char {
     if status.contains(Status::WT_NEW) {
-        '?'
+        'A'
     } else if status.contains(Status::WT_MODIFIED) {
         'M'
     } else if status.contains(Status::WT_DELETED) {
@@ -554,9 +739,11 @@ fn load_stashes(repository: &mut Repository) -> Result<Vec<GitStashEntry>, Strin
     let mut stashes = Vec::new();
 
     match repository.stash_foreach(|index, message, _oid| {
+            let (name, detail) = parse_stash_display(message, index);
             stashes.push(GitStashEntry {
-                name: format!("stash@{{{index}}}"),
-                message: message.to_string(),
+                index,
+                name,
+                message: detail,
             });
             true
         }) {
@@ -571,6 +758,26 @@ fn load_stashes(repository: &mut Repository) -> Result<Vec<GitStashEntry>, Strin
     }
 
     Ok(stashes)
+}
+
+fn parse_stash_display(message: &str, index: usize) -> (String, String) {
+    let trimmed = message.trim();
+
+    if let Some((prefix, title)) = trimmed.rsplit_once(": ") {
+        let stash_name = if title.trim().is_empty() {
+            format!("stash@{{{index}}}")
+        } else {
+            title.trim().to_string()
+        };
+
+        return (stash_name, prefix.trim().to_string());
+    }
+
+    if trimmed.is_empty() {
+        (format!("stash@{{{index}}}"), String::new())
+    } else {
+        (trimmed.to_string(), String::new())
+    }
 }
 
 fn load_submodules(repository: &Repository) -> Result<Vec<GitSubmoduleEntry>, String> {
@@ -599,6 +806,10 @@ pub fn run() {
             open_repository,
             get_repository_status,
             commit_all,
+            fetch_origin,
+            stash_changes,
+            apply_stash,
+            pop_stash,
             get_commit_history_chunk
         ])
         .run(tauri::generate_context!())

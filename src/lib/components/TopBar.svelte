@@ -5,6 +5,9 @@
   export let repository = null;
   export let loading = false;
   export let topActions = [];
+  export let implementedActions = [];
+  export let activeAction = "";
+  export let onAction = () => {};
   export let onRefresh = () => {};
 
   function actionKey(action) {
@@ -24,8 +27,13 @@
   <div class="toolbar-cluster">
     <div class="toolbar">
       {#each topActions as action}
-        <button class="toolbar-button" disabled={!repository}>
-          {$_(actionKey(action))}
+        <button
+          class:active={activeAction === action}
+          class="toolbar-button"
+          disabled={!repository || loading || !implementedActions.includes(action)}
+          on:click={() => onAction(action)}
+        >
+          {activeAction === action ? $_("topbar.syncing") : $_(actionKey(action))}
         </button>
       {/each}
       <button class="toolbar-button active" on:click={onRefresh} disabled={!repository || loading}>

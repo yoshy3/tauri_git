@@ -3,7 +3,13 @@
 
   export let repository = null;
   export let loading = false;
+  export let selectedStashIndex = null;
+  export let stashBusyAction = "";
   export let onSelectRepository = () => {};
+  export let onSelectStash = () => {};
+  export let onCancelSelectedStash = () => {};
+  export let onApplySelectedStash = () => {};
+  export let onPopSelectedStash = () => {};
 
   let sidebarFilter = "";
   let sidebarSections = {
@@ -76,6 +82,10 @@
         matchesSidebarFilter(`${submodule.name} ${submodule.path}`),
       )
     : [];
+  $: selectedStash =
+    repository && selectedStashIndex !== null
+      ? repository.stashes.find((stash) => stash.index === selectedStashIndex) ?? null
+      : null;
 </script>
 
 <aside class="sidebar">
@@ -214,13 +224,55 @@
         </button>
 
         {#if sidebarSections.stashes}
+          {#if selectedStash}
+            <div class="stash-actions">
+              <div class="stash-actions-copy">
+                <strong>{selectedStash.name}</strong>
+                <span>{selectedStash.message}</span>
+              </div>
+              <div class="stash-actions-buttons">
+                <button
+                  class="stash-action-button stash-action-button-neutral"
+                  type="button"
+                  disabled={loading}
+                  on:click={onCancelSelectedStash}
+                >
+                  {$_("sidebar.cancel")}
+                </button>
+                <button
+                  class="stash-action-button"
+                  type="button"
+                  disabled={loading}
+                  on:click={() => onApplySelectedStash(selectedStash.index)}
+                >
+                  {stashBusyAction === "apply" ? $_("sidebar.applying") : $_("sidebar.apply")}
+                </button>
+                <button
+                  class="stash-action-button stash-action-button-danger"
+                  type="button"
+                  disabled={loading}
+                  on:click={() => onPopSelectedStash(selectedStash.index)}
+                >
+                  {stashBusyAction === "pop" ? $_("sidebar.popping") : $_("sidebar.pop")}
+                </button>
+              </div>
+            </div>
+          {/if}
+
           {#if filteredStashes.length > 0}
             <ul class="tree-list tree-section-children">
               {#each filteredStashes as stash}
-                <li class="tree-item tree-item-stack">
-                  <span class="tree-item-icon tree-item-stash"></span>
-                  <span class="tree-item-label">{stash.name}</span>
-                  <span class="tree-item-detail">{stash.message}</span>
+                <li>
+                  <button
+                    class:tree-item-current={stash.index === selectedStashIndex}
+                    class="tree-item tree-item-button tree-item-stack"
+                    type="button"
+                    on:click={() => onSelectStash(stash.index)}
+                  >
+                    <span class="tree-item-icon tree-item-stash"></span>
+                    <span class="tree-item-label">{stash.name}</span>
+                    <span class="tree-item-detail">{stash.message}</span>
+                  </button>
                 </li>
               {/each}
             </ul>
@@ -481,6 +533,14 @@
     box-sizing: border-box;
   }
 
+  .tree-item-button {
+    width: 100%;
+    border: 0;
+    background: transparent;
+    text-align: left;
+    cursor: pointer;
+  }
+
   .tree-item.tree-item-current {
     background: rgba(255, 255, 255, 0.08);
     color: #f8fbff;
@@ -556,6 +616,75 @@
 
   .tree-empty.tree-empty-nested {
     padding-left: 24px;
+  }
+
+  .stash-actions {
+    display: grid;
+    gap: 8px;
+    margin: 2px 0 8px 12px;
+    padding: 8px 10px;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(120, 148, 177, 0.08);
+  }
+
+  .stash-actions-copy {
+    display: grid;
+    gap: 2px;
+    min-width: 0;
+  }
+
+  .stash-actions-copy strong {
+    color: #eef5fb;
+    font-size: 0.75rem;
+    line-height: 1.2;
+  }
+
+  .stash-actions-copy span {
+    color: #7f95aa;
+    font-size: 0.69rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .stash-actions-buttons {
+    display: flex;
+    gap: 6px;
+  }
+
+  .stash-action-button {
+    border: 0;
+    border-radius: 8px;
+    background: rgba(32, 84, 138, 0.22);
+    color: #eaf4fd;
+    padding: 7px 10px;
+    font-size: 0.69rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+  }
+
+  .stash-action-button:hover:enabled {
+    background: rgba(39, 100, 163, 0.34);
+  }
+
+  .stash-action-button-neutral {
+    background: rgba(17, 30, 43, 0.92);
+    color: #c8d6e4;
+    border: 1px solid rgba(120, 148, 177, 0.12);
+  }
+
+  .stash-action-button-neutral:hover:enabled {
+    background: rgba(25, 40, 56, 0.96);
+  }
+
+  .stash-action-button-danger {
+    background: rgba(132, 59, 39, 0.24);
+    color: #ffd6c7;
+  }
+
+  .stash-action-button-danger:hover:enabled {
+    background: rgba(156, 70, 46, 0.34);
   }
 
   @media (max-width: 860px) {

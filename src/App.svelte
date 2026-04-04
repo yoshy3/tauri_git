@@ -13,13 +13,19 @@
   let error = "";
   let loading = false;
   let committing = false;
+  let stashing = false;
+  let topbarBusyAction = "";
+  let stashBusyAction = "";
+  let selectedStashIndex = null;
   let rightPaneExpanded = false;
+  let rightPaneTab = "commit";
   let historyCommits = [];
   let historyLoading = false;
   let historyLoadedAll = false;
   let historyRequestId = 0;
 
-  const topActions = ["Fetch", "Pull", "Push", "Stash", "Pop"];
+  const topActions = ["Fetch", "Pull", "Push", "Stash"];
+  const implementedTopActions = ["Fetch", "Stash"];
   const lastRepositoryKey = "tauri-git:last-repository-path";
   const historyBatchSize = 100;
 
@@ -46,6 +52,7 @@
     resetHistoryState();
     if (resetPane) {
       rightPaneExpanded = false;
+      rightPaneTab = "commit";
     }
     loading = true;
 
@@ -91,17 +98,51 @@
     }
 
     loading = true;
+    topbarBusyAction = "Refresh";
     error = "";
     try {
       repository = await invoke("get_repository_status", {
         path: repository.repo_path,
       });
       rightPaneExpanded = false;
+      rightPaneTab = "commit";
       void loadCommitHistory(repository.repo_path);
     } catch (message) {
       error = String(message);
     } finally {
       loading = false;
+      topbarBusyAction = "";
+    }
+  }
+
+  async function handleTopAction(action) {
+    if (!repository || !implementedTopActions.includes(action)) {
+      return;
+    }
+
+    if (action === "Stash") {
+      rightPaneExpanded = true;
+      rightPaneTab = "stash";
+      return;
+    }
+
+    loading = true;
+    topbarBusyAction = action;
+    error = "";
+
+    try {
+      if (action === "Fetch") {
+        repository = await invoke("fetch_origin", {
+          path: repository.repo_path,
+        });
+      }
+
+      void loadCommitHistory(repository.repo_path);
+    } catch (message) {
+      error = String(message);
+    } finally {
+      loading = false;
+      topbarBusyAction = "";
     }
   }
 
@@ -125,6 +166,7 @@
       });
       repository = updated;
       rightPaneExpanded = false;
+      rightPaneTab = "commit";
       void loadCommitHistory(repository.repo_path);
       return true;
     } catch (messageText) {
@@ -135,8 +177,98 @@
     }
   }
 
+  async function stashChanges(message, selectedPaths) {
+    if (!repository) {
+      error = t("errors.openRepositoryFirst");
+      return false;
+    }
+
+    if (!selectedPaths.length) {
+      error = t("errors.stashFilesEmpty");
+      return false;
+    }
+
+    stashing = true;
+    error = "";
+
+    try {
+      repository = await invoke("stash_changes", {
+        path: repository.repo_path,
+        message,
+        selectedPaths,
+      });
+      rightPaneExpanded = false;
+      rightPaneTab = "commit";
+      selectedStashIndex = null;
+      void loadCommitHistory(repository.repo_path);
+      return true;
+    } catch (messageText) {
+      error = String(messageText);
+      return false;
+    } finally {
+      stashing = false;
+    }
+  }
+
   function toggleRightPane() {
-    rightPaneExpanded = !rightPaneExpanded;
+    if (rightPaneExpanded) {
+      rightPaneExpanded = false;
+      rightPaneTab = "commit";
+      return;
+    }
+
+    rightPaneExpanded = true;
+    rightPaneTab = "commit";
+  }
+
+  async function applySelectedStash(index) {
+    if (!repository) {
+      error = t("errors.openRepositoryFirst");
+      return;
+    }
+
+    loading = true;
+    stashBusyAction = "apply";
+    error = "";
+
+    try {
+      repository = await invoke("apply_stash", {
+        path: repository.repo_path,
+        index,
+      });
+      selectedStashIndex = null;
+      void loadCommitHistory(repository.repo_path);
+    } catch (message) {
+      error = String(message);
+    } finally {
+      loading = false;
+      stashBusyAction = "";
+    }
+  }
+
+  async function popSelectedStash(index) {
+    if (!repository) {
+      error = t("errors.openRepositoryFirst");
+      return;
+    }
+
+    loading = true;
+    stashBusyAction = "pop";
+    error = "";
+
+    try {
+      repository = await invoke("pop_stash", {
+        path: repository.repo_path,
+        index,
+      });
+      selectedStashIndex = null;
+      void loadCommitHistory(repository.repo_path);
+    } catch (message) {
+      error = String(message);
+    } finally {
+      loading = false;
+      stashBusyAction = "";
+    }
   }
 
   async function loadCommitHistory(path) {
@@ -195,6 +327,12 @@
   });
 
   $: changedEntries = repository ? repository.entries : [];
+  $: if (repository && selectedStashIndex !== null) {
+    const stillExists = repository.stashes?.some((stash) => stash.index === selectedStashIndex);
+    if (!stillExists) {
+      selectedStashIndex = null;
+    }
+  }
 </script>
 
 <svelte:head>
@@ -202,10 +340,28 @@
 </svelte:head>
 
 <div class="app-shell">
-  <TopBar {repository} {loading} {topActions} onRefresh={refreshRepository} />
+  <TopBar
+    {repository}
+    {loading}
+    {topActions}
+    implementedActions={implementedTopActions}
+    activeAction={topbarBusyAction}
+    onAction={handleTopAction}
+    onRefresh={refreshRepository}
+  />
 
   <main class:workspace-collapsed={!rightPaneExpanded} class="workspace">
-    <SidebarPane {repository} {loading} onSelectRepository={selectRepository} />
+    <SidebarPane
+      {repository}
+      {loading}
+      selectedStashIndex={selectedStashIndex}
+      stashBusyAction={stashBusyAction}
+      onSelectRepository={selectRepository}
+      onSelectStash={(index) => (selectedStashIndex = index)}
+      onCancelSelectedStash={() => (selectedStashIndex = null)}
+      onApplySelectedStash={applySelectedStash}
+      onPopSelectedStash={popSelectedStash}
+    />
 
     <HistoryPane
       {repository}
@@ -219,8 +375,12 @@
       {repository}
       changedEntries={changedEntries}
       expanded={rightPaneExpanded}
+      activeTab={rightPaneTab}
       {committing}
+      {stashing}
       onToggle={toggleRightPane}
+      onSelectTab={(tab) => (rightPaneTab = tab)}
+      onStash={stashChanges}
       onCommit={commitChanges}
     />
   </main>
