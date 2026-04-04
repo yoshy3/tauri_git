@@ -6,10 +6,13 @@
   export let loading = false;
   export let selectedStashIndex = null;
   export let stashBusyAction = "";
+  export let menuOpenKey = "";
   export let onSelectRepository = () => {};
   export let onSelectStash = () => {};
-  export let onCheckoutLocalBranch = () => {};
-  export let onCheckoutRemoteBranch = () => {};
+  export let onToggleMenu = () => {};
+  export let onCheckoutReference = () => {};
+  export let onCreateBranchFromReference = () => {};
+  export let onDeleteReference = () => {};
   export let onCancelSelectedStash = () => {};
   export let onApplySelectedStash = () => {};
   export let onPopSelectedStash = () => {};
@@ -175,13 +178,16 @@
 
         {#if sidebarSections.branches}
           {#if filteredLocalBranches.length > 0}
-            <div class="tree-section-children">
+            <div class="tree-branch-root">
               <BranchTreeNode
                 nodes={localBranchTree}
                 {loading}
                 currentBranch={repository.branch}
-                {onCheckoutLocalBranch}
-                {onCheckoutRemoteBranch}
+                {menuOpenKey}
+                {onToggleMenu}
+                {onCheckoutReference}
+                {onCreateBranchFromReference}
+                {onDeleteReference}
               />
             </div>
           {:else}
@@ -220,8 +226,11 @@
                           {loading}
                           currentBranch={repository.branch}
                           remoteName={group.name}
-                          {onCheckoutLocalBranch}
-                          {onCheckoutRemoteBranch}
+                          {menuOpenKey}
+                          {onToggleMenu}
+                          {onCheckoutReference}
+                          {onCreateBranchFromReference}
+                          {onDeleteReference}
                         />
                       </div>
                     {:else}
@@ -541,6 +550,10 @@
   .tree-section-children,
   .tree-nested-list {
     margin-left: 12px;
+  }
+
+  .tree-branch-root {
+    margin-left: 0;
   }
 
   .tree-group-details > summary {

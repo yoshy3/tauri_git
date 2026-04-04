@@ -1,7 +1,7 @@
 <script>
   import { onMount } from "svelte";
   import { invoke } from "@tauri-apps/api/core";
-  import { confirm, open } from "@tauri-apps/plugin-dialog";
+  import { open } from "@tauri-apps/plugin-dialog";
   import { _ } from "svelte-i18n";
   import { get } from "svelte/store";
   import TopBar from "./lib/components/TopBar.svelte";
@@ -17,12 +17,20 @@
   let topbarBusyAction = "";
   let stashBusyAction = "";
   let selectedStashIndex = null;
+  let selectedRef = null;
+  let branchMenuOpenKey = "";
   let rightPaneExpanded = false;
   let rightPaneTab = "commit";
   let historyCommits = [];
   let historyLoading = false;
   let historyLoadedAll = false;
   let historyRequestId = 0;
+  let branchDialogOpen = false;
+  let branchNameDraft = "";
+  let branchSwitchAfterCreate = true;
+  let deleteDialogOpen = false;
+  let deleteBranchNameDraft = "";
+  let deleteTargetRef = null;
 
   const topActions = ["Fetch", "Pull", "Push", "Stash"];
   const implementedTopActions = ["Fetch", "Pull", "Push", "Stash"];
@@ -40,6 +48,22 @@
     historyLoadedAll = false;
   }
 
+  function resetBranchDialog() {
+    branchDialogOpen = false;
+    branchNameDraft = "";
+    branchSwitchAfterCreate = true;
+  }
+
+  function resetDeleteDialog() {
+    deleteDialogOpen = false;
+    deleteBranchNameDraft = "";
+    deleteTargetRef = null;
+  }
+
+  function closeBranchMenu() {
+    branchMenuOpenKey = "";
+  }
+
   async function openRepositoryAt(path, options = {}) {
     const { remember = true, resetPane = true, clearSavedOnError = false } = options;
     const trimmed = path.trim();
@@ -49,6 +73,8 @@
 
     error = "";
     repository = null;
+    selectedRef = null;
+    closeBranchMenu();
     resetHistoryState();
     if (resetPane) {
       rightPaneExpanded = false;
@@ -104,6 +130,8 @@
       repository = await invoke("get_repository_status", {
         path: repository.repo_path,
       });
+      selectedRef = null;
+      closeBranchMenu();
       rightPaneExpanded = false;
       rightPaneTab = "commit";
       void loadCommitHistory(repository.repo_path);
@@ -255,6 +283,122 @@
         remoteName,
       });
       selectedStashIndex = null;
+      selectedRef = null;
+      closeBranchMenu();
+      rightPaneExpanded = false;
+      rightPaneTab = "commit";
+      void loadCommitHistory(repository.repo_path);
+    } catch (message) {
+      error = String(message);
+    } finally {
+      loading = false;
+    }
+  }
+
+  async function checkoutSelectedRef() {
+    if (!selectedRef || !selectedRef.canCheckout) {
+      return;
+    }
+
+    if (selectedRef.kind === "local_branch") {
+      await checkoutBranch(selectedRef.name);
+      return;
+    }
+
+    if (selectedRef.kind === "remote_branch") {
+      await checkoutBranch(selectedRef.name, selectedRef.remoteName);
+    }
+  }
+
+  async function checkoutReference(ref) {
+    selectedRef = ref;
+    await checkoutSelectedRef();
+  }
+
+  async function deleteReference(ref) {
+    if (!repository || !ref?.canDelete) {
+      return;
+    }
+    closeBranchMenu();
+    deleteTargetRef = ref;
+    deleteBranchNameDraft = "";
+    deleteDialogOpen = true;
+  }
+
+  async function confirmDeleteReference() {
+    if (!repository || !deleteTargetRef?.canDelete) {
+      return;
+    }
+
+    if (deleteBranchNameDraft.trim() !== deleteTargetRef.displayName) {
+      error = t("branchDelete.nameMismatch");
+      return;
+    }
+
+    loading = true;
+    error = "";
+
+    try {
+      repository = await invoke("delete_branch", {
+        path: repository.repo_path,
+        branchName: deleteTargetRef.name,
+        branchKind: deleteTargetRef.kind,
+        remoteName: deleteTargetRef.remoteName ?? null,
+      });
+      if (selectedRef?.key === deleteTargetRef.key) {
+        selectedRef = null;
+      }
+      resetDeleteDialog();
+      void loadCommitHistory(repository.repo_path);
+    } catch (message) {
+      error = String(message);
+    } finally {
+      loading = false;
+    }
+  }
+
+  function openCreateBranchDialog(ref = selectedRef) {
+    if (!ref?.canCreateBranch) {
+      return;
+    }
+
+    selectedRef = ref;
+    closeBranchMenu();
+    branchNameDraft = "";
+    branchSwitchAfterCreate = true;
+    branchDialogOpen = true;
+  }
+
+  async function createBranchFromSelectedRef() {
+    if (!repository) {
+      error = t("errors.openRepositoryFirst");
+      return;
+    }
+
+    if (!selectedRef?.canCreateBranch) {
+      return;
+    }
+
+    if (!branchNameDraft.trim()) {
+      error = t("errors.branchNameEmpty");
+      return;
+    }
+
+    loading = true;
+    error = "";
+
+    try {
+      repository = await invoke("create_branch", {
+        path: repository.repo_path,
+        branchName: branchNameDraft.trim(),
+        sourceName: selectedRef.name,
+        sourceKind: selectedRef.kind,
+        sourceRemoteName: selectedRef.remoteName ?? null,
+        switchAfterCreate: branchSwitchAfterCreate,
+      });
+      selectedRef = null;
+      selectedStashIndex = null;
+      resetBranchDialog();
       rightPaneExpanded = false;
       rightPaneTab = "commit";
       void loadCommitHistory(repository.repo_path);
@@ -377,6 +521,18 @@
       selectedStashIndex = null;
     }
   }
+  $: if (repository && selectedRef) {
+    const stillExists =
+      (selectedRef.kind === "local_branch" && repository.local_branches?.includes(selectedRef.name)) ||
+      (selectedRef.kind === "remote_branch" &&
+        repository.remote_groups?.some(
+          (group) => group.name === selectedRef.remoteName && group.branches.includes(selectedRef.name),
+        )) ||
+      (selectedRef.kind === "tag" && repository.tags?.includes(selectedRef.name));
+    if (!stillExists) {
+      selectedRef = null;
+    }
+  }
 </script>
 
 <svelte:head>
@@ -399,11 +555,15 @@
       {repository}
       {loading}
       selectedStashIndex={selectedStashIndex}
+      {selectedRef}
       stashBusyAction={stashBusyAction}
       onSelectRepository={selectRepository}
       onSelectStash={(index) => (selectedStashIndex = index)}
-      onCheckoutLocalBranch={(branchName) => checkoutBranch(branchName)}
-      onCheckoutRemoteBranch={(remoteName, branchName) => checkoutBranch(branchName, remoteName)}
+      menuOpenKey={branchMenuOpenKey}
+      onToggleMenu={(key) => (branchMenuOpenKey = key)}
+      onCheckoutReference={checkoutReference}
+      onCreateBranchFromReference={openCreateBranchDialog}
+      onDeleteReference={deleteReference}
       onCancelSelectedStash={() => (selectedStashIndex = null)}
       onApplySelectedStash={applySelectedStash}
       onPopSelectedStash={popSelectedStash}
@@ -430,6 +590,73 @@
       onCommit={commitChanges}
     />
   </main>
+
+  {#if branchDialogOpen && selectedRef}
+    <div class="dialog-backdrop" role="presentation" on:click={(event) => event.target === event.currentTarget && !loading && resetBranchDialog()}>
+      <section class="dialog-card" role="dialog" aria-modal="true" aria-labelledby="branch-dialog-title">
+        <div class="dialog-copy">
+          <h2 id="branch-dialog-title">{t("branchDialog.title")}</h2>
+          <p>{t("branchDialog.fromSource", { source: selectedRef.displayName })}</p>
+        </div>
+
+        <label class="dialog-field">
+          <span>{t("branchDialog.nameLabel")}</span>
+          <input bind:value={branchNameDraft} placeholder={t("branchDialog.namePlaceholder")} disabled={loading} />
+        </label>
+
+        <label class="dialog-checkbox">
+          <input type="checkbox" bind:checked={branchSwitchAfterCreate} disabled={loading} />
+          <span>{t("branchDialog.switchAfterCreate")}</span>
+        </label>
+
+        <div class="dialog-actions">
+          <button class="dialog-button dialog-button-muted" type="button" on:click={resetBranchDialog} disabled={loading}>
+            {t("branchDialog.cancel")}
+          </button>
+          <button class="dialog-button" type="button" on:click={createBranchFromSelectedRef} disabled={loading}>
+            {loading ? t("branchDialog.creating") : t("branchDialog.create")}
+          </button>
+        </div>
+      </section>
+    </div>
+  {/if}
+
+  {#if deleteDialogOpen && deleteTargetRef}
+    <div class="dialog-backdrop" role="presentation" on:click={(event) => event.target === event.currentTarget && !loading && resetDeleteDialog()}>
+      <section class="dialog-card" role="dialog" aria-modal="true" aria-labelledby="delete-dialog-title">
+        <div class="dialog-copy">
+          <h2 id="delete-dialog-title">{t("branchDelete.title")}</h2>
+          <p>{t("branchDelete.description", { branch: deleteTargetRef.displayName })}</p>
+        </div>
+
+        <div class="dialog-warning">
+          <span class="dialog-warning-label">{t("branchDelete.targetLabel")}</span>
+          <code>{deleteTargetRef.displayName}</code>
+        </div>
+
+        <label class="dialog-field">
+          <span>{t("branchDelete.inputLabel")}</span>
+          <input bind:value={deleteBranchNameDraft} placeholder={deleteTargetRef.displayName} disabled={loading} />
+        </label>
+
+        <p class="dialog-helper">{t("branchDelete.inputHint", { branch: deleteTargetRef.displayName })}</p>
+
+        <div class="dialog-actions">
+          <button class="dialog-button dialog-button-muted" type="button" on:click={resetDeleteDialog} disabled={loading}>
+            {t("branchDelete.cancel")}
+          </button>
+          <button
+            class="dialog-button dialog-button-danger"
+            type="button"
+            on:click={confirmDeleteReference}
+            disabled={loading || deleteBranchNameDraft.trim() !== deleteTargetRef.displayName}
+          >
+            {loading ? t("branchDelete.deleting") : t("branchDelete.delete")}
+          </button>
+        </div>
+      </section>
+    </div>
+  {/if}
 </div>
 
 <style>
@@ -451,6 +678,129 @@
 
   .workspace.workspace-collapsed {
     grid-template-columns: 246px minmax(0, 1fr) 54px;
+  }
+
+  .dialog-backdrop {
+    position: fixed;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    padding: 20px;
+    background: rgba(4, 10, 16, 0.66);
+    backdrop-filter: blur(8px);
+    z-index: 20;
+  }
+
+  .dialog-card {
+    width: min(100%, 420px);
+    display: grid;
+    gap: 14px;
+    padding: 18px;
+    border-radius: 14px;
+    background: linear-gradient(180deg, rgba(11, 23, 36, 0.98), rgba(10, 21, 33, 0.97));
+    border: 1px solid rgba(120, 148, 177, 0.14);
+    box-shadow: 0 18px 48px rgba(0, 0, 0, 0.34);
+  }
+
+  .dialog-copy h2 {
+    margin: 0;
+    color: #f4f8fc;
+    font-size: 1rem;
+  }
+
+  .dialog-copy p {
+    margin: 6px 0 0;
+    color: #9cb1c7;
+    font-size: 0.82rem;
+    line-height: 1.4;
+    word-break: break-word;
+  }
+
+  .dialog-field {
+    display: grid;
+    gap: 6px;
+  }
+
+  .dialog-field span,
+  .dialog-checkbox span {
+    color: #cfe0f2;
+    font-size: 0.78rem;
+  }
+
+  .dialog-field input {
+    width: 100%;
+    box-sizing: border-box;
+    border: 1px solid rgba(120, 148, 177, 0.14);
+    border-radius: 10px;
+    background: #040a10;
+    color: #e8eef5;
+    padding: 11px 12px;
+  }
+
+  .dialog-field input:focus {
+    outline: none;
+    border-color: rgba(84, 155, 233, 0.7);
+    box-shadow: 0 0 0 3px rgba(35, 101, 168, 0.18);
+    background: #06101a;
+  }
+
+  .dialog-checkbox {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .dialog-checkbox input[type="checkbox"] {
+    accent-color: #4da0ff;
+  }
+
+  .dialog-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+  }
+
+  .dialog-warning {
+    display: grid;
+    gap: 4px;
+    padding: 10px 12px;
+    border-radius: 10px;
+    background: rgba(134, 63, 43, 0.12);
+    border: 1px solid rgba(190, 104, 76, 0.2);
+  }
+
+  .dialog-warning-label,
+  .dialog-helper {
+    color: #cfe0f2;
+    font-size: 0.74rem;
+    line-height: 1.4;
+  }
+
+  .dialog-warning code {
+    color: #ffd8cb;
+    font-size: 0.8rem;
+    word-break: break-word;
+  }
+
+  .dialog-button {
+    border: 0;
+    border-radius: 10px;
+    background: linear-gradient(180deg, #1e68b0, #0d57a0);
+    color: #eef5ff;
+    padding: 10px 14px;
+    font-size: 0.76rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+  }
+
+  .dialog-button.dialog-button-muted {
+    background: rgba(17, 30, 43, 0.92);
+    color: #c8d6e4;
+    border: 1px solid rgba(120, 148, 177, 0.12);
+  }
+
+  .dialog-button.dialog-button-danger {
+    background: linear-gradient(180deg, #9a4a34, #7d3526);
   }
 
   @media (max-width: 1180px) {

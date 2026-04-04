@@ -6,9 +6,10 @@
     "openRepository": "Git リポジトリを開く"
   },
   "errors": {
-    "openRepositoryFirst": "先にリポジトリを読み込んでください。",
+    "openRepositoryFirst": "先にリポジトリを開いてください。",
     "commitMessageEmpty": "コミットメッセージが空です。",
-    "stashFilesEmpty": "stash するファイルを 1 つ以上選択してください。"
+    "stashFilesEmpty": "stash するファイルを 1 つ以上選択してください。",
+    "branchNameEmpty": "ブランチ名が空です。"
   },
   "topbar": {
     "subtitle": "ミニマルな Git クライアント",
@@ -22,10 +23,31 @@
     "syncing": "Syncing..."
   },
   "push": {
-    "missingOriginTitle": "origin が未設定です",
-    "missingOriginMessage": "このリポジトリには origin リモートがありません。push の前に origin を設定してください。",
+    "missingOriginTitle": "origin が設定されていません",
+    "missingOriginMessage": "このリポジトリには origin リモートがありません。Push の前に origin を設定してください。",
     "dialogOk": "OK",
     "dialogCancel": "キャンセル"
+  },
+  "branchDialog": {
+    "title": "ブランチを作成",
+    "fromSource": "{source} から新しいブランチを作成します。",
+    "nameLabel": "ブランチ名",
+    "namePlaceholder": "feature/new-branch",
+    "switchAfterCreate": "作成後に自動で切り替える",
+    "cancel": "キャンセル",
+    "create": "ブランチを作成",
+    "creating": "作成中..."
+  },
+  "branchDelete": {
+    "title": "ブランチを削除",
+    "description": "{branch} を削除します。確認のため、下に完全なブランチ名を入力してください。",
+    "targetLabel": "削除対象",
+    "inputLabel": "ブランチ名を入力",
+    "inputHint": "{branch} を正確に入力すると削除できます。",
+    "nameMismatch": "入力したブランチ名が一致しません。",
+    "delete": "ブランチを削除",
+    "deleting": "削除中...",
+    "cancel": "キャンセル"
   },
   "sidebar": {
     "refs": "Refs",
@@ -39,18 +61,22 @@
     "tags": "Tags",
     "stashes": "Stashes",
     "submodules": "Submodules",
+    "selectedRef": "選択中の Ref",
+    "selectedTag": "選択中の Tag",
+    "checkout": "Checkout",
+    "newBranch": "New Branch",
     "cancel": "Cancel",
     "apply": "Apply",
     "applying": "適用中...",
     "pop": "Pop",
     "popping": "Pop 中...",
     "emptyState": "左上の Open からリポジトリを選択してください。",
-    "branchesEmpty": "表示できるブランチはありません。",
-    "remotesEmpty": "表示できるリモートはありません。",
-    "tagsEmpty": "表示できるタグはありません。",
+    "branchesEmpty": "表示できるブランチがありません。",
+    "remotesEmpty": "表示できるリモートがありません。",
+    "tagsEmpty": "表示できるタグがありません。",
     "stashesEmpty": "stash はありません。",
     "submodulesEmpty": "submodule はありません。",
-    "matchingBranchesEmpty": "一致するブランチはありません。"
+    "matchingBranchesEmpty": "一致するブランチがありません。"
   },
   "history": {
     "searchPlaceholder": "コミットを検索...",
@@ -65,10 +91,10 @@
       "hash": "Hash",
       "date": "Date"
     },
-    "loadingTitle": "コミット履歴を読み込み中です。",
-    "loadingBody": "読み込んだところから順次表示します。",
+    "loadingTitle": "コミット履歴を読み込んでいます。",
+    "loadingBody": "読み込みが進むにつれて一覧が更新されます。",
     "emptyTitle": "表示できるコミット履歴がありません。",
-    "emptyBody": "まずリポジトリを開くか、最初のコミットを作成してください。"
+    "emptyBody": "リポジトリを開くか、最初のコミットを作成してください。"
   },
   "commit": {
     "openPanel": "Open Changes Panel",
@@ -78,23 +104,23 @@
     "commitTab": "Commit",
     "stashTab": "Stash",
     "filesTitle": "Changed Files ({count})",
-    "filesCaption": "現在の作業ツリーで変更されているファイルです",
-    "filesEmpty": "コミット対象の変更はありません。",
+    "filesCaption": "現在の作業ツリーで変更されているファイルです。",
+    "filesEmpty": "コミットできる変更はありません。",
     "stashTitle": "Stash Changes",
-    "stashCaption": "stash するファイルを選んで、必要なら名前を付けます",
+    "stashCaption": "stash するファイルを選んで、必要なら名前を付けられます。",
     "stashMessageLabel": "Stash 名",
     "stashMessagePlaceholder": "任意の stash 名",
     "stashSelectionCount": "{count} 件選択中",
     "selectAll": "すべて選択",
     "clear": "クリア",
-    "stashEmpty": "stash 対象の変更はありません。",
+    "stashEmpty": "stash できる変更はありません。",
     "stashAction": "Stash を作成",
     "stashing": "stash 作成中...",
     "commitTitle": "Create Commit",
     "summaryLabel": "Summary (必須)",
     "summaryPlaceholder": "短いコミット要約",
     "descriptionLabel": "Description",
-    "descriptionPlaceholder": "必要なら詳細説明を入力",
+    "descriptionPlaceholder": "必要に応じて詳しい説明を入力",
     "committing": "コミット中...",
     "commitToBranch": "{branch} にコミット",
     "branchFallback": "ブランチ"

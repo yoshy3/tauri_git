@@ -3,8 +3,11 @@
   export let loading = false;
   export let currentBranch = "";
   export let remoteName = null;
-  export let onCheckoutLocalBranch = () => {};
-  export let onCheckoutRemoteBranch = () => {};
+  export let menuOpenKey = "";
+  export let onToggleMenu = () => {};
+  export let onCheckoutReference = () => {};
+  export let onCreateBranchFromReference = () => {};
+  export let onDeleteReference = () => {};
 
   function isCurrentBranch(node) {
     if (!node.isBranch) {
@@ -18,19 +21,40 @@
     return node.fullName === currentBranch;
   }
 
-  function handleBranchClick(node) {
-    if (!node.isBranch || loading) {
+  function branchRef(node) {
+    return {
+      key: node.key,
+      kind: remoteName ? "remote_branch" : "local_branch",
+      name: node.fullName,
+      remoteName,
+      displayName: remoteName ? `${remoteName}/${node.fullName}` : node.fullName,
+      canCheckout: true,
+      canCreateBranch: true,
+      canDelete: true,
+    };
+  }
+
+  function openMenu(node) {
+    if (loading || !node.isBranch) {
       return;
     }
 
-    if (remoteName) {
-      onCheckoutRemoteBranch(remoteName, node.fullName);
-      return;
-    }
+    onToggleMenu(menuOpenKey === node.key ? "" : node.key);
+  }
 
-    if (node.fullName !== currentBranch) {
-      onCheckoutLocalBranch(node.fullName);
-    }
+  function checkout(node) {
+    onToggleMenu("");
+    onCheckoutReference(branchRef(node));
+  }
+
+  function createBranch(node) {
+    onToggleMenu("");
+    onCreateBranchFromReference(branchRef(node));
+  }
+
+  function deleteBranch(node) {
+    onToggleMenu("");
+    onDeleteReference(branchRef(node));
   }
 </script>
 
@@ -38,16 +62,40 @@
   {#each nodes as node (node.key)}
     <li class="branch-tree-node">
       {#if node.isBranch}
-        <button
-          class:tree-item-current={isCurrentBranch(node)}
-          class="tree-item tree-item-button"
-          type="button"
-          disabled={loading}
-          on:click={() => handleBranchClick(node)}
-        >
-          <span class="tree-item-icon tree-item-branch"></span>
-          <span class="tree-item-label">{node.label}</span>
-        </button>
+        <div class:tree-item-current={isCurrentBranch(node)} class="tree-item-row">
+          <div class="tree-item-copy">
+            <span class="tree-item-icon tree-item-branch"></span>
+            <span class="tree-item-label">{node.label}</span>
+          </div>
+
+          <div class:menu-open={menuOpenKey === node.key} class="tree-item-actions">
+            <button
+              class="tree-item-kebab"
+              type="button"
+              aria-label="Branch actions"
+              disabled={loading}
+              on:click={() => openMenu(node)}
+            >
+              <span></span>
+              <span></span>
+              <span></span>
+            </button>
+
+            {#if menuOpenKey === node.key}
+              <div class="tree-item-menu">
+                <button class="tree-item-menu-button" type="button" on:click={() => checkout(node)} disabled={loading}>
+                  Checkout
+                </button>
+                <button class="tree-item-menu-button" type="button" on:click={() => createBranch(node)} disabled={loading}>
+                  New Branch
+                </button>
+                <button class="tree-item-menu-button tree-item-menu-button-danger" type="button" on:click={() => deleteBranch(node)} disabled={loading || (!remoteName && isCurrentBranch(node))}>
+                  Delete Branch
+                </button>
+              </div>
+            {/if}
+          </div>
+        </div>
       {:else}
         <details class="branch-folder" open>
           <summary class="tree-group-toggle branch-folder-toggle">
@@ -62,8 +110,11 @@
               {loading}
               {currentBranch}
               {remoteName}
-              {onCheckoutLocalBranch}
-              {onCheckoutRemoteBranch}
+              {menuOpenKey}
+              {onToggleMenu}
+              {onCheckoutReference}
+              {onCreateBranchFromReference}
+              {onDeleteReference}
             />
           </div>
         </details>
@@ -86,47 +137,132 @@
     gap: 0;
   }
 
-  .tree-item,
+  .tree-item-row,
   .tree-group-toggle {
     width: 100%;
     border: 0;
     background: transparent;
     color: #abbcce;
     display: grid;
-    grid-template-columns: auto minmax(0, 1fr);
-    gap: 8px;
     align-items: center;
     min-height: 24px;
-    padding: 3px 8px 3px 4px;
     border-radius: 8px;
     box-sizing: border-box;
     font-size: 0.78rem;
     text-align: left;
   }
 
-  .tree-group-toggle {
-    grid-template-columns: auto auto minmax(0, 1fr);
+  .tree-item-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 6px;
+    padding: 3px 4px;
+    position: relative;
   }
 
-  .tree-item-button {
-    cursor: pointer;
+  .tree-item-copy {
+    min-width: 0;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 8px;
+    align-items: center;
+    padding: 0 4px 0 0;
   }
 
-  .tree-item-button:hover:enabled,
+  .tree-item-row:hover,
   .tree-group-toggle:hover {
     background: rgba(255, 255, 255, 0.04);
     color: #eef5fb;
   }
 
-  .tree-item-button:disabled {
-    cursor: default;
-  }
-
-  .tree-item.tree-item-current {
+  .tree-item-row.tree-item-current {
     background: rgba(101, 168, 239, 0.2);
     color: #eef7ff;
     font-weight: 700;
     box-shadow: inset 0 0 0 1px rgba(108, 177, 248, 0.28);
+  }
+
+  .tree-item-actions {
+    position: relative;
+    display: flex;
+    align-items: center;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 120ms ease;
+  }
+
+  .tree-item-row:hover .tree-item-actions,
+  .tree-item-actions.menu-open {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .tree-item-kebab {
+    width: 24px;
+    height: 24px;
+    display: inline-flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    gap: 3px;
+    border: 0;
+    border-radius: 7px;
+    background: rgba(10, 20, 31, 0.92);
+    color: #dce8f4;
+    padding: 0;
+  }
+
+  .tree-item-kebab:hover:enabled {
+    background: rgba(25, 50, 75, 0.95);
+  }
+
+  .tree-item-kebab span {
+    width: 3px;
+    height: 3px;
+    border-radius: 999px;
+    background: currentColor;
+  }
+
+  .tree-item-menu {
+    position: absolute;
+    top: calc(100% + 4px);
+    right: 0;
+    min-width: 128px;
+    display: grid;
+    gap: 2px;
+    padding: 6px;
+    border-radius: 10px;
+    background: rgba(9, 18, 28, 0.98);
+    border: 1px solid rgba(120, 148, 177, 0.16);
+    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.35);
+    z-index: 8;
+  }
+
+  .tree-item-menu-button {
+    border: 0;
+    border-radius: 7px;
+    background: transparent;
+    color: #dce8f4;
+    padding: 8px 10px;
+    font-size: 0.74rem;
+    text-align: left;
+  }
+
+  .tree-item-menu-button:hover:enabled {
+    background: rgba(255, 255, 255, 0.05);
+  }
+
+  .tree-item-menu-button.tree-item-menu-button-danger {
+    color: #ffd3cc;
+  }
+
+  .tree-item-menu-button.tree-item-menu-button-danger:hover:enabled {
+    background: rgba(156, 70, 46, 0.18);
+  }
+
+  .tree-group-toggle {
+    grid-template-columns: auto auto minmax(0, 1fr);
+    gap: 8px;
+    padding: 3px 4px;
   }
 
   .tree-item-icon {
@@ -174,7 +310,7 @@
   }
 
   .branch-folder-children {
-    margin-left: 12px;
+    margin-left: 8px;
   }
 
   .tree-chevron {

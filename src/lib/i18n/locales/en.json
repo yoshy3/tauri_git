@@ -8,7 +8,8 @@
   "errors": {
     "openRepositoryFirst": "Open a repository first.",
     "commitMessageEmpty": "Commit message is empty.",
-    "stashFilesEmpty": "Select at least one file to stash."
+    "stashFilesEmpty": "Select at least one file to stash.",
+    "branchNameEmpty": "Branch name is empty."
   },
   "topbar": {
     "subtitle": "Minimal git client",
@@ -27,6 +28,27 @@
     "dialogOk": "OK",
     "dialogCancel": "Cancel"
   },
+  "branchDialog": {
+    "title": "Create Branch",
+    "fromSource": "Create a new branch from {source}.",
+    "nameLabel": "Branch Name",
+    "namePlaceholder": "feature/new-branch",
+    "switchAfterCreate": "Switch to the new branch after creating it",
+    "cancel": "Cancel",
+    "create": "Create Branch",
+    "creating": "Creating..."
+  },
+  "branchDelete": {
+    "title": "Delete Branch",
+    "description": "This action will delete {branch}. Type the full branch name below to confirm.",
+    "targetLabel": "Delete target",
+    "inputLabel": "Branch name",
+    "inputHint": "Enter {branch} exactly to enable deletion.",
+    "nameMismatch": "The branch name does not match.",
+    "delete": "Delete Branch",
+    "deleting": "Deleting...",
+    "cancel": "Cancel"
+  },
   "sidebar": {
     "refs": "Refs",
     "open": "Open",
@@ -39,6 +61,10 @@
     "tags": "Tags",
     "stashes": "Stashes",
     "submodules": "Submodules",
+    "selectedRef": "Selected Ref",
+    "selectedTag": "Selected Tag",
+    "checkout": "Checkout",
+    "newBranch": "New Branch",
     "cancel": "Cancel",
     "apply": "Apply",
     "applying": "Applying...",
