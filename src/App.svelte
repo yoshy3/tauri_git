@@ -1,7 +1,8 @@
 <script>
+  import { onMount } from "svelte";
   import { invoke } from "@tauri-apps/api/core";
+  import { open } from "@tauri-apps/plugin-dialog";
 
-  let repoPath = "";
   let commitSummary = "";
   let commitDescription = "";
   let repository = null;
@@ -9,30 +10,75 @@
   let loading = false;
   let committing = false;
   let rightPaneExpanded = false;
+  let lastOpenedPath = "";
+  let historyCommits = [];
+  let historyLoading = false;
+  let historyLoadedAll = false;
+  let historyRequestId = 0;
 
   const topActions = ["Fetch", "Pull", "Push", "Stash", "Pop"];
   const navItems = ["Branches", "Remotes", "Tags", "Stashes"];
+  const lastRepositoryKey = "tauri-git:last-repository-path";
+  const historyBatchSize = 100;
 
-  async function loadRepository() {
-    error = "";
-    repository = null;
-    rightPaneExpanded = false;
+  function resetHistoryState() {
+    historyRequestId += 1;
+    historyCommits = [];
+    historyLoading = false;
+    historyLoadedAll = false;
+  }
 
-    const trimmed = repoPath.trim();
+  async function openRepositoryAt(path, options = {}) {
+    const { remember = true, resetPane = true, clearSavedOnError = false } = options;
+    const trimmed = path.trim();
     if (!trimmed) {
-      error = "Git リポジトリのパスを入力してください。";
       return;
     }
 
+    error = "";
+    repository = null;
+    resetHistoryState();
+    if (resetPane) {
+      rightPaneExpanded = false;
+    }
     loading = true;
+
     try {
       repository = await invoke("open_repository", { path: trimmed });
-      repoPath = repository.repo_path;
+      lastOpenedPath = repository.repo_path;
+      if (remember) {
+        localStorage.setItem(lastRepositoryKey, repository.repo_path);
+      }
+      void loadCommitHistory(repository.repo_path);
     } catch (message) {
+      if (remember || clearSavedOnError) {
+        localStorage.removeItem(lastRepositoryKey);
+        lastOpenedPath = "";
+      }
       error = String(message);
     } finally {
       loading = false;
     }
+  }
+
+  async function selectRepository() {
+    error = "";
+    const selected = await open({
+      directory: true,
+      multiple: false,
+      title: "Open Git Repository",
+    });
+
+    if (!selected) {
+      return;
+    }
+
+    const path = Array.isArray(selected) ? selected[0] : selected;
+    if (!path) {
+      return;
+    }
+
+    await openRepositoryAt(path);
   }
 
   async function refreshRepository() {
@@ -46,7 +92,9 @@
       repository = await invoke("get_repository_status", {
         path: repository.repo_path,
       });
+      lastOpenedPath = repository.repo_path;
       rightPaneExpanded = false;
+      void loadCommitHistory(repository.repo_path);
     } catch (message) {
       error = String(message);
     } finally {
@@ -80,6 +128,7 @@
       rightPaneExpanded = false;
       commitSummary = "";
       commitDescription = "";
+      void loadCommitHistory(repository.repo_path);
     } catch (messageText) {
       error = String(messageText);
     } finally {
@@ -96,16 +145,6 @@
     }
 
     return staged || unstaged || "clean";
-  }
-
-  function selectEntries(kind) {
-    if (!repository) {
-      return [];
-    }
-
-    return repository.entries.filter((entry) =>
-      kind === "staged" ? entry.index_status !== "." : entry.working_tree_status !== ".",
-    );
   }
 
   function initials(name) {
@@ -145,6 +184,62 @@
   function toggleRightPane() {
     rightPaneExpanded = !rightPaneExpanded;
   }
+
+  async function loadCommitHistory(path) {
+    const requestId = historyRequestId + 1;
+    historyRequestId = requestId;
+    historyCommits = [];
+    historyLoading = true;
+    historyLoadedAll = false;
+
+    let offset = 0;
+
+    try {
+      while (true) {
+        const chunk = await invoke("get_commit_history_chunk", {
+          path,
+          offset,
+          limit: historyBatchSize,
+        });
+
+        if (requestId !== historyRequestId) {
+          return;
+        }
+
+        if (chunk.commits.length > 0) {
+          historyCommits = [...historyCommits, ...chunk.commits];
+          offset += chunk.commits.length;
+        }
+
+        if (!chunk.has_more) {
+          historyLoadedAll = true;
+          break;
+        }
+
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      }
+    } catch (message) {
+      if (requestId !== historyRequestId) {
+        return;
+      }
+
+      error = String(message);
+    } finally {
+      if (requestId === historyRequestId) {
+        historyLoading = false;
+      }
+    }
+  }
+
+  onMount(() => {
+    const savedPath = localStorage.getItem(lastRepositoryKey);
+    if (!savedPath) {
+      return;
+    }
+
+    lastOpenedPath = savedPath;
+    void openRepositoryAt(savedPath, { remember: false, clearSavedOnError: true });
+  });
 
   $: changedEntries = repository ? repository.entries : [];
 </script>
@@ -194,17 +289,15 @@
       </section>
 
       <section class="open-panel">
-        <label>
-          <span>Path</span>
-          <input
-            bind:value={repoPath}
-            placeholder="/path/to/repository"
-            on:keydown={(event) => event.key === "Enter" && loadRepository()}
-          />
-        </label>
-        <button class="primary wide" on:click={loadRepository} disabled={loading}>
-          {loading ? "Opening..." : "Open Repository"}
+        <p class="sidebar-label">Open</p>
+        <button class="primary wide" on:click={selectRepository} disabled={loading}>
+          {loading ? "Opening..." : "Choose Repository Folder"}
         </button>
+        {#if lastOpenedPath}
+          <p class="open-hint">Last opened: {lastOpenedPath}</p>
+        {:else}
+          <p class="open-hint">フォルダ選択ダイアログから Git リポジトリを開きます。</p>
+        {/if}
       </section>
 
       <button class="new-branch" disabled={!repository}>New Branch</button>
@@ -252,7 +345,8 @@
         <div class="history-meta">
           {#if repository}
             <span>{repository.branch}</span>
-            <span>{repository.recent_commits.length} commits</span>
+            <span>{historyCommits.length} commits</span>
+            <span>{historyLoading ? "loading..." : historyLoadedAll ? "complete" : ""}</span>
           {/if}
         </div>
       </div>
@@ -274,14 +368,14 @@
           <span>Date</span>
         </div>
 
-        {#if repository && repository.recent_commits.length > 0}
+        {#if repository && historyCommits.length > 0}
           <ul class="history-rows">
-            {#each repository.recent_commits as commit, index}
+            {#each historyCommits as commit, index}
               <li>
                 <div class="graph-cell">
                   <span class="graph-line"></span>
                   <span class:graph-node-main={index === 0} class="graph-node"></span>
-                  {#if index < repository.recent_commits.length - 1}
+                  {#if index < historyCommits.length - 1}
                     <span class="graph-tail"></span>
                   {/if}
                 </div>
@@ -311,6 +405,11 @@
               </li>
             {/each}
           </ul>
+        {:else if repository && historyLoading}
+          <div class="empty-history">
+            <p>コミット履歴を読み込み中です。</p>
+            <p class="muted">読み込んだところから順次表示します。</p>
+          </div>
         {:else}
           <div class="empty-history">
             <p>表示できるコミット履歴がありません。</p>
@@ -586,16 +685,22 @@
     letter-spacing: 0.08em;
   }
 
-  .open-panel label,
   .commit-panel label {
     display: grid;
     gap: 5px;
   }
 
-  .open-panel span,
   .commit-panel span {
     color: #8aa0b8;
     font-size: 0.78rem;
+  }
+
+  .open-hint {
+    margin: 8px 0 0;
+    color: #6f859c;
+    font-size: 0.74rem;
+    line-height: 1.4;
+    word-break: break-all;
   }
 
   input,

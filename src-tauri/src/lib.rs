@@ -17,7 +17,6 @@ struct GitStatusResponse {
     is_clean: bool,
     entries: Vec<GitStatusEntry>,
     head_summary: Option<String>,
-    recent_commits: Vec<GitCommitSummary>,
     local_branches: Vec<String>,
 }
 
@@ -27,6 +26,12 @@ struct GitCommitSummary {
     summary: String,
     author: String,
     committed_at: String,
+}
+
+#[derive(Serialize)]
+struct GitCommitHistoryChunk {
+    commits: Vec<GitCommitSummary>,
+    has_more: bool,
 }
 
 #[tauri::command]
@@ -45,6 +50,16 @@ fn commit_all(path: String, message: String) -> Result<GitStatusResponse, String
     let repository = open_repo(&path)?;
     create_commit(&repository, &message)?;
     build_repository_status(&repository)
+}
+
+#[tauri::command]
+fn get_commit_history_chunk(
+    path: String,
+    offset: usize,
+    limit: usize,
+) -> Result<GitCommitHistoryChunk, String> {
+    let repository = open_repo(&path)?;
+    load_commit_history_chunk(&repository, offset, limit)
 }
 
 fn open_repo(path: &str) -> Result<Repository, String> {
@@ -124,7 +139,6 @@ fn build_repository_status(repository: &Repository) -> Result<GitStatusResponse,
             format!("{short_id} {summary}")
         });
 
-    let recent_commits = load_recent_commits(repository, 10)?;
     let local_branches = load_local_branches(repository)?;
 
     Ok(GitStatusResponse {
@@ -134,7 +148,6 @@ fn build_repository_status(repository: &Repository) -> Result<GitStatusResponse,
         is_clean: entries.is_empty(),
         entries,
         head_summary,
-        recent_commits,
         local_branches,
     })
 }
@@ -238,10 +251,11 @@ fn worktree_status_code(status: Status) -> char {
     }
 }
 
-fn load_recent_commits(
+fn load_commit_history_chunk(
     repository: &Repository,
+    offset: usize,
     limit: usize,
-) -> Result<Vec<GitCommitSummary>, String> {
+) -> Result<GitCommitHistoryChunk, String> {
     let mut revwalk = repository
         .revwalk()
         .map_err(|error| format!("コミット履歴を読み込めませんでした: {}", error.message()))?;
@@ -253,8 +267,18 @@ fn load_recent_commits(
         .map_err(|error| format!("コミット履歴の並び替えに失敗しました: {}", error.message()))?;
 
     let mut commits = Vec::new();
+    let mut has_more = false;
 
-    for oid_result in revwalk.take(limit) {
+    for (index, oid_result) in revwalk.enumerate() {
+        if index < offset {
+            continue;
+        }
+
+        if commits.len() >= limit {
+            has_more = true;
+            break;
+        }
+
         let oid = oid_result
             .map_err(|error| format!("コミット ID を取得できませんでした: {}", error.message()))?;
         let commit = repository
@@ -274,7 +298,7 @@ fn load_recent_commits(
         });
     }
 
-    Ok(commits)
+    Ok(GitCommitHistoryChunk { commits, has_more })
 }
 
 fn load_local_branches(repository: &Repository) -> Result<Vec<String>, String> {
@@ -301,10 +325,12 @@ fn load_local_branches(repository: &Repository) -> Result<Vec<String>, String> {
 
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![
             open_repository,
             get_repository_status,
-            commit_all
+            commit_all,
+            get_commit_history_chunk
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
