@@ -434,7 +434,8 @@
 
   .sidebar-tree {
     min-height: 0;
-    overflow: auto;
+    overflow-y: auto;
+    overflow-x: hidden;
     display: grid;
     gap: 0;
     align-content: start;
@@ -623,6 +624,7 @@
     gap: 8px;
     margin: 2px 0 8px 12px;
     padding: 8px 10px;
+    min-width: 0;
     border-radius: 10px;
     background: rgba(255, 255, 255, 0.03);
     border: 1px solid rgba(120, 148, 177, 0.08);
@@ -649,11 +651,15 @@
   }
 
   .stash-actions-buttons {
-    display: flex;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 6px;
+    min-width: 0;
   }
 
   .stash-action-button {
+    width: 100%;
+    min-width: 0;
     border: 0;
     border-radius: 8px;
     background: rgba(32, 84, 138, 0.22);
@@ -662,6 +668,7 @@
     font-size: 0.69rem;
     font-weight: 700;
     letter-spacing: 0.04em;
+    white-space: nowrap;
   }
 
   .stash-action-button:hover:enabled {

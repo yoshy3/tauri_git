@@ -7,6 +7,11 @@
     linear-gradient(180deg, #07111a 0%, #0a1621 100%);
   --panel-background: linear-gradient(180deg, rgba(11, 23, 36, 0.98), rgba(11, 22, 34, 0.95));
   --panel-border: rgba(120, 148, 177, 0.08);
+  --scrollbar-track: rgba(7, 15, 23, 0.92);
+  --scrollbar-thumb: linear-gradient(180deg, rgba(143, 159, 177, 0.92), rgba(111, 128, 148, 0.94));
+  --scrollbar-thumb-hover: linear-gradient(180deg, rgba(177, 193, 212, 0.96), rgba(132, 151, 172, 0.98));
+  --scrollbar-thumb-active: linear-gradient(180deg, rgba(201, 214, 228, 0.98), rgba(150, 168, 188, 1));
+  --scrollbar-border: rgba(9, 18, 28, 0.9);
 }
 
 html,
@@ -20,6 +25,40 @@ body,
 body {
   min-height: 100vh;
   overflow: hidden;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(133, 150, 169, 0.95) var(--scrollbar-track);
+}
+
+*::-webkit-scrollbar {
+  width: 14px;
+  height: 14px;
+}
+
+*::-webkit-scrollbar-track {
+  background: var(--scrollbar-track);
+  border-radius: 999px;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border-radius: 999px;
+  border: 3px solid var(--scrollbar-border);
+  background-clip: padding-box;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--scrollbar-thumb-hover);
+}
+
+*::-webkit-scrollbar-thumb:active {
+  background: var(--scrollbar-thumb-active);
+}
+
+*::-webkit-scrollbar-corner {
+  background: transparent;
 }
 
 button,
