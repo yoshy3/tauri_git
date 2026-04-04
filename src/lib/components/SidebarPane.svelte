@@ -1,4 +1,6 @@
 <script>
+  import { _ } from "svelte-i18n";
+
   export let repository = null;
   export let loading = false;
   export let onSelectRepository = () => {};
@@ -78,9 +80,9 @@
 
 <aside class="sidebar">
   <div class="sidebar-toolbar">
-    <button class="sidebar-tool sidebar-tool-active" type="button" disabled>Refs</button>
+    <button class="sidebar-tool sidebar-tool-active" type="button" disabled>{$_("sidebar.refs")}</button>
     <button class="sidebar-tool" type="button" on:click={onSelectRepository} disabled={loading}>
-      {loading ? "Opening..." : "Open"}
+      {loading ? $_("sidebar.opening") : $_("sidebar.open")}
     </button>
   </div>
 
@@ -95,15 +97,15 @@
       </div>
       <p class="path">{repository.repo_path}</p>
     {:else}
-      <h1>No repository</h1>
-      <p class="muted">フォルダ選択ダイアログから Git リポジトリを開いてください。</p>
+      <h1>{$_("sidebar.noRepository")}</h1>
+      <p class="muted">{$_("sidebar.openRepositoryHint")}</p>
     {/if}
   </section>
 
   <div class="sidebar-filter-wrap">
     <input
       class="sidebar-filter"
-      placeholder="Filter"
+      placeholder={$_("sidebar.filter")}
       bind:value={sidebarFilter}
       disabled={!repository}
     />
@@ -111,12 +113,12 @@
 
   <section class="sidebar-tree">
     {#if !repository}
-      <p class="tree-empty">左上の Open からリポジトリを選択してください。</p>
+      <p class="tree-empty">{$_("sidebar.emptyState")}</p>
     {:else}
       <div class="tree-section">
         <button class="tree-section-toggle" type="button" on:click={() => toggleSidebarSection("branches")}>
           <span class:expanded={sidebarSections.branches} class="tree-chevron"></span>
-          <span>Branches</span>
+          <span>{$_("sidebar.branches")}</span>
         </button>
 
         {#if sidebarSections.branches}
@@ -130,7 +132,7 @@
               {/each}
             </ul>
           {:else}
-            <p class="tree-empty">表示できるブランチはありません。</p>
+            <p class="tree-empty">{$_("sidebar.branchesEmpty")}</p>
           {/if}
         {/if}
       </div>
@@ -138,7 +140,7 @@
       <div class="tree-section">
         <button class="tree-section-toggle" type="button" on:click={() => toggleSidebarSection("remotes")}>
           <span class:expanded={sidebarSections.remotes} class="tree-chevron"></span>
-          <span>Remotes</span>
+          <span>{$_("sidebar.remotes")}</span>
         </button>
 
         {#if sidebarSections.remotes}
@@ -171,14 +173,14 @@
                         {/each}
                       </ul>
                     {:else}
-                      <p class="tree-empty tree-empty-nested">一致するブランチはありません。</p>
+                      <p class="tree-empty tree-empty-nested">{$_("sidebar.matchingBranchesEmpty")}</p>
                     {/if}
                   </details>
                 </li>
               {/each}
             </ul>
           {:else}
-            <p class="tree-empty">表示できるリモートはありません。</p>
+            <p class="tree-empty">{$_("sidebar.remotesEmpty")}</p>
           {/if}
         {/if}
       </div>
@@ -186,7 +188,7 @@
       <div class="tree-section">
         <button class="tree-section-toggle" type="button" on:click={() => toggleSidebarSection("tags")}>
           <span class:expanded={sidebarSections.tags} class="tree-chevron"></span>
-          <span>Tags</span>
+          <span>{$_("sidebar.tags")}</span>
         </button>
 
         {#if sidebarSections.tags}
@@ -200,7 +202,7 @@
               {/each}
             </ul>
           {:else}
-            <p class="tree-empty">表示できるタグはありません。</p>
+            <p class="tree-empty">{$_("sidebar.tagsEmpty")}</p>
           {/if}
         {/if}
       </div>
@@ -208,7 +210,7 @@
       <div class="tree-section">
         <button class="tree-section-toggle" type="button" on:click={() => toggleSidebarSection("stashes")}>
           <span class:expanded={sidebarSections.stashes} class="tree-chevron"></span>
-          <span>Stashes</span>
+          <span>{$_("sidebar.stashes")}</span>
         </button>
 
         {#if sidebarSections.stashes}
@@ -223,7 +225,7 @@
               {/each}
             </ul>
           {:else}
-            <p class="tree-empty">stash はありません。</p>
+            <p class="tree-empty">{$_("sidebar.stashesEmpty")}</p>
           {/if}
         {/if}
       </div>
@@ -231,7 +233,7 @@
       <div class="tree-section">
         <button class="tree-section-toggle" type="button" on:click={() => toggleSidebarSection("submodules")}>
           <span class:expanded={sidebarSections.submodules} class="tree-chevron"></span>
-          <span>Submodules</span>
+          <span>{$_("sidebar.submodules")}</span>
         </button>
 
         {#if sidebarSections.submodules}
@@ -246,7 +248,7 @@
               {/each}
             </ul>
           {:else}
-            <p class="tree-empty">submodule はありません。</p>
+            <p class="tree-empty">{$_("sidebar.submodulesEmpty")}</p>
           {/if}
         {/if}
       </div>

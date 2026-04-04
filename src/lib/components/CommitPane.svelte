@@ -1,4 +1,6 @@
 <script>
+  import { _ } from "svelte-i18n";
+
   export let repository = null;
   export let changedEntries = [];
   export let expanded = false;
@@ -18,7 +20,7 @@
       return `${staged}/${unstaged}`;
     }
 
-    return staged || unstaged || "clean";
+    return staged || unstaged || $_("status.clean");
   }
 
   function shortPath(path) {
@@ -64,10 +66,10 @@
   <button class:attention={changedEntries.length > 0} class="pane-toggle" on:click={onToggle}>
     <span class="pane-toggle-label">
       {expanded
-        ? "Close Commit Panel"
+        ? $_("commit.closePanel")
         : changedEntries.length > 0
-          ? `Open Commit Panel (${changedEntries.length})`
-          : "Open Commit Panel"}
+          ? $_("commit.openPanelWithCount", { values: { count: changedEntries.length } })
+          : $_("commit.openPanel")}
     </span>
   </button>
 
@@ -75,8 +77,8 @@
     <section class="changes-panel">
       <div class="changes-summary">
         <div class="changes-summary-copy">
-          <h2>Commit Files ({changedEntries.length})</h2>
-          <p class="changes-caption">変更は自動でステージしてまとめてコミットします</p>
+          <h2>{$_("commit.filesTitle", { values: { count: changedEntries.length } })}</h2>
+          <p class="changes-caption">{$_("commit.filesCaption")}</p>
         </div>
       </div>
 
@@ -96,24 +98,28 @@
             {/each}
           </ul>
         {:else}
-          <p class="empty-side">コミット対象の変更はありません。</p>
+          <p class="empty-side">{$_("commit.filesEmpty")}</p>
         {/if}
       </div>
     </section>
 
     <section class="commit-panel">
       <label>
-        <span>Summary (required)</span>
-        <input bind:value={commitSummary} placeholder="Short commit summary" />
+        <span>{$_("commit.summaryLabel")}</span>
+        <input bind:value={commitSummary} placeholder={$_("commit.summaryPlaceholder")} />
       </label>
 
       <label>
-        <span>Description</span>
-        <textarea bind:value={commitDescription} rows="6" placeholder="Optional longer description"></textarea>
+        <span>{$_("commit.descriptionLabel")}</span>
+        <textarea bind:value={commitDescription} rows="6" placeholder={$_("commit.descriptionPlaceholder")}></textarea>
       </label>
 
       <button class="primary wide" on:click={handleCommit} disabled={!repository || committing || repository.is_clean}>
-        {committing ? "Committing..." : `Commit to ${repository ? repository.branch : "branch"}`}
+        {committing
+          ? $_("commit.committing")
+          : $_("commit.commitToBranch", {
+              values: { branch: repository ? repository.branch : $_("commit.branchFallback") },
+            })}
       </button>
     </section>
   {/if}

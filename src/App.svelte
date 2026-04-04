@@ -2,6 +2,8 @@
   import { onMount } from "svelte";
   import { invoke } from "@tauri-apps/api/core";
   import { open } from "@tauri-apps/plugin-dialog";
+  import { _ } from "svelte-i18n";
+  import { get } from "svelte/store";
   import TopBar from "./lib/components/TopBar.svelte";
   import SidebarPane from "./lib/components/SidebarPane.svelte";
   import HistoryPane from "./lib/components/HistoryPane.svelte";
@@ -20,6 +22,10 @@
   const topActions = ["Fetch", "Pull", "Push", "Stash", "Pop"];
   const lastRepositoryKey = "tauri-git:last-repository-path";
   const historyBatchSize = 100;
+
+  function t(key, values) {
+    return get(_)(key, { values });
+  }
 
   function resetHistoryState() {
     historyRequestId += 1;
@@ -64,7 +70,7 @@
     const selected = await open({
       directory: true,
       multiple: false,
-      title: "Open Git Repository",
+      title: t("dialog.openRepository"),
     });
 
     if (!selected) {
@@ -101,12 +107,12 @@
 
   async function commitChanges(message) {
     if (!repository) {
-      error = "先にリポジトリを読み込んでください。";
+      error = t("errors.openRepositoryFirst");
       return false;
     }
 
     if (!message.trim()) {
-      error = "コミットメッセージが空です。";
+      error = t("errors.commitMessageEmpty");
       return false;
     }
 
@@ -192,7 +198,7 @@
 </script>
 
 <svelte:head>
-  <title>Tauri Git</title>
+  <title>{t("app.title")}</title>
 </svelte:head>
 
 <div class="app-shell">

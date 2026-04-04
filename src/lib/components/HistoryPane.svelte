@@ -1,4 +1,6 @@
 <script>
+  import { _ } from "svelte-i18n";
+
   export let repository = null;
   export let error = "";
   export let historyCommits = [];
@@ -203,18 +205,18 @@
 
 <section class="center-pane">
   <div class="history-toolbar">
-    <input class="search" placeholder="Search commits..." disabled={!repository} />
+    <input class="search" placeholder={$_("history.searchPlaceholder")} disabled={!repository} />
     <div class="history-meta">
       {#if repository}
         <span>{repository.branch}</span>
-        <span>{historyCommits.length} commits</span>
-        <span>{historyLoading ? "loading..." : historyLoadedAll ? "complete" : ""}</span>
+        <span>{$_("history.commitCount", { values: { count: historyCommits.length } })}</span>
+        <span>{historyLoading ? $_("history.loading") : historyLoadedAll ? $_("history.complete") : ""}</span>
       {/if}
     </div>
   </div>
 
   {#if repository && repository.head_summary}
-    <div class="head-pill">HEAD {repository.head_summary}</div>
+    <div class="head-pill">{$_("history.headSummary", { values: { summary: repository.head_summary } })}</div>
   {/if}
 
   {#if error}
@@ -223,11 +225,11 @@
 
   <section class="history-table" style={`--graph-column-width: ${historyGraphWidth}px;`}>
     <div class="history-head">
-      <span>Graph</span>
-      <span>Subject</span>
-      <span>Author</span>
-      <span>Hash</span>
-      <span>Date</span>
+      <span>{$_("history.columns.graph")}</span>
+      <span>{$_("history.columns.subject")}</span>
+      <span>{$_("history.columns.author")}</span>
+      <span>{$_("history.columns.hash")}</span>
+      <span>{$_("history.columns.date")}</span>
     </div>
 
     {#if repository && historyCommits.length > 0}
@@ -296,13 +298,13 @@
       </ul>
     {:else if repository && historyLoading}
       <div class="empty-history">
-        <p>コミット履歴を読み込み中です。</p>
-        <p class="muted">読み込んだところから順次表示します。</p>
+        <p>{$_("history.loadingTitle")}</p>
+        <p class="muted">{$_("history.loadingBody")}</p>
       </div>
     {:else}
       <div class="empty-history">
-        <p>表示できるコミット履歴がありません。</p>
-        <p class="muted">まずリポジトリを開くか、最初のコミットを作成してください。</p>
+        <p>{$_("history.emptyTitle")}</p>
+        <p class="muted">{$_("history.emptyBody")}</p>
       </div>
     {/if}
   </section>

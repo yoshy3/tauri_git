@@ -1,0 +1,79 @@
+{
+  "app": {
+    "title": "Tauri Git"
+  },
+  "dialog": {
+    "openRepository": "Git リポジトリを開く"
+  },
+  "errors": {
+    "openRepositoryFirst": "先にリポジトリを読み込んでください。",
+    "commitMessageEmpty": "コミットメッセージが空です。"
+  },
+  "topbar": {
+    "subtitle": "ミニマルな Git クライアント",
+    "language": "言語",
+    "fetch": "Fetch",
+    "pull": "Pull",
+    "push": "Push",
+    "stash": "Stash",
+    "pop": "Pop",
+    "refresh": "Refresh",
+    "syncing": "Syncing..."
+  },
+  "sidebar": {
+    "refs": "Refs",
+    "open": "Open",
+    "opening": "Opening...",
+    "noRepository": "No repository",
+    "openRepositoryHint": "フォルダ選択ダイアログから Git リポジトリを開いてください。",
+    "filter": "Filter",
+    "branches": "Branches",
+    "remotes": "Remotes",
+    "tags": "Tags",
+    "stashes": "Stashes",
+    "submodules": "Submodules",
+    "emptyState": "左上の Open からリポジトリを選択してください。",
+    "branchesEmpty": "表示できるブランチはありません。",
+    "remotesEmpty": "表示できるリモートはありません。",
+    "tagsEmpty": "表示できるタグはありません。",
+    "stashesEmpty": "stash はありません。",
+    "submodulesEmpty": "submodule はありません。",
+    "matchingBranchesEmpty": "一致するブランチはありません。"
+  },
+  "history": {
+    "searchPlaceholder": "コミットを検索...",
+    "loading": "読み込み中...",
+    "complete": "完了",
+    "commitCount": "{count} 件のコミット",
+    "headSummary": "HEAD {summary}",
+    "columns": {
+      "graph": "Graph",
+      "subject": "Subject",
+      "author": "Author",
+      "hash": "Hash",
+      "date": "Date"
+    },
+    "loadingTitle": "コミット履歴を読み込み中です。",
+    "loadingBody": "読み込んだところから順次表示します。",
+    "emptyTitle": "表示できるコミット履歴がありません。",
+    "emptyBody": "まずリポジトリを開くか、最初のコミットを作成してください。"
+  },
+  "commit": {
+    "openPanel": "Open Commit Panel",
+    "openPanelWithCount": "Open Commit Panel ({count})",
+    "closePanel": "Close Commit Panel",
+    "filesTitle": "Commit Files ({count})",
+    "filesCaption": "変更は自動でステージしてまとめてコミットします",
+    "filesEmpty": "コミット対象の変更はありません。",
+    "summaryLabel": "Summary (必須)",
+    "summaryPlaceholder": "短いコミット要約",
+    "descriptionLabel": "Description",
+    "descriptionPlaceholder": "必要なら詳細説明を入力",
+    "committing": "コミット中...",
+    "commitToBranch": "{branch} にコミット",
+    "branchFallback": "ブランチ"
+  },
+  "status": {
+    "clean": "clean"
+  }
+}

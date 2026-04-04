@@ -1,0 +1,79 @@
+{
+  "app": {
+    "title": "Tauri Git"
+  },
+  "dialog": {
+    "openRepository": "Open Git Repository"
+  },
+  "errors": {
+    "openRepositoryFirst": "Open a repository first.",
+    "commitMessageEmpty": "Commit message is empty."
+  },
+  "topbar": {
+    "subtitle": "Minimal git client",
+    "language": "Language",
+    "fetch": "Fetch",
+    "pull": "Pull",
+    "push": "Push",
+    "stash": "Stash",
+    "pop": "Pop",
+    "refresh": "Refresh",
+    "syncing": "Syncing..."
+  },
+  "sidebar": {
+    "refs": "Refs",
+    "open": "Open",
+    "opening": "Opening...",
+    "noRepository": "No repository",
+    "openRepositoryHint": "Open a Git repository from the folder picker.",
+    "filter": "Filter",
+    "branches": "Branches",
+    "remotes": "Remotes",
+    "tags": "Tags",
+    "stashes": "Stashes",
+    "submodules": "Submodules",
+    "emptyState": "Select a repository from Open in the top-left.",
+    "branchesEmpty": "No branches to display.",
+    "remotesEmpty": "No remotes to display.",
+    "tagsEmpty": "No tags to display.",
+    "stashesEmpty": "No stashes.",
+    "submodulesEmpty": "No submodules.",
+    "matchingBranchesEmpty": "No matching branches."
+  },
+  "history": {
+    "searchPlaceholder": "Search commits...",
+    "loading": "loading...",
+    "complete": "complete",
+    "commitCount": "{count} commits",
+    "headSummary": "HEAD {summary}",
+    "columns": {
+      "graph": "Graph",
+      "subject": "Subject",
+      "author": "Author",
+      "hash": "Hash",
+      "date": "Date"
+    },
+    "loadingTitle": "Loading commit history.",
+    "loadingBody": "The list updates as chunks arrive.",
+    "emptyTitle": "No commit history available.",
+    "emptyBody": "Open a repository or create the first commit."
+  },
+  "commit": {
+    "openPanel": "Open Commit Panel",
+    "openPanelWithCount": "Open Commit Panel ({count})",
+    "closePanel": "Close Commit Panel",
+    "filesTitle": "Commit Files ({count})",
+    "filesCaption": "Changes are auto-staged and committed together.",
+    "filesEmpty": "No changes available to commit.",
+    "summaryLabel": "Summary (required)",
+    "summaryPlaceholder": "Short commit summary",
+    "descriptionLabel": "Description",
+    "descriptionPlaceholder": "Optional longer description",
+    "committing": "Committing...",
+    "commitToBranch": "Commit to {branch}",
+    "branchFallback": "branch"
+  },
+  "status": {
+    "clean": "clean"
+  }
+}
