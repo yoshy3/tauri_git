@@ -1,7 +1,7 @@
 <script>
   import { onMount } from "svelte";
   import { invoke } from "@tauri-apps/api/core";
-  import { open } from "@tauri-apps/plugin-dialog";
+  import { confirm, open } from "@tauri-apps/plugin-dialog";
   import { _ } from "svelte-i18n";
   import { get } from "svelte/store";
   import TopBar from "./lib/components/TopBar.svelte";
@@ -25,7 +25,7 @@
   let historyRequestId = 0;
 
   const topActions = ["Fetch", "Pull", "Push", "Stash"];
-  const implementedTopActions = ["Fetch", "Stash"];
+  const implementedTopActions = ["Fetch", "Pull", "Push", "Stash"];
   const lastRepositoryKey = "tauri-git:last-repository-path";
   const historyBatchSize = 100;
 
@@ -126,6 +126,16 @@
       return;
     }
 
+    if (action === "Push" && !repository.has_origin_remote) {
+      await confirm(t("push.missingOriginMessage"), {
+        title: t("push.missingOriginTitle"),
+        kind: "warning",
+        okLabel: t("push.dialogOk"),
+        cancelLabel: t("push.dialogCancel"),
+      });
+      return;
+    }
+
     loading = true;
     topbarBusyAction = action;
     error = "";
@@ -133,6 +143,14 @@
     try {
       if (action === "Fetch") {
         repository = await invoke("fetch_origin", {
+          path: repository.repo_path,
+        });
+      } else if (action === "Pull") {
+        repository = await invoke("pull_current_branch", {
+          path: repository.repo_path,
+        });
+      } else if (action === "Push") {
+        repository = await invoke("push_current_branch", {
           path: repository.repo_path,
         });
       }

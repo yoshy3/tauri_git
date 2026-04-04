@@ -21,6 +21,12 @@
     "refresh": "Refresh",
     "syncing": "Syncing..."
   },
+  "push": {
+    "missingOriginTitle": "Origin not configured",
+    "missingOriginMessage": "This repository does not have an origin remote. Configure origin before pushing.",
+    "dialogOk": "OK",
+    "dialogCancel": "Cancel"
+  },
   "sidebar": {
     "refs": "Refs",
     "open": "Open",

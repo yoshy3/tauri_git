@@ -16,6 +16,7 @@ struct GitStatusResponse {
     repo_name: String,
     repo_path: String,
     branch: String,
+    has_origin_remote: bool,
     is_clean: bool,
     entries: Vec<GitStatusEntry>,
     head_summary: Option<String>,
@@ -92,6 +93,20 @@ fn commit_all(path: String, message: String) -> Result<GitStatusResponse, String
 fn fetch_origin(path: String) -> Result<GitStatusResponse, String> {
     let mut repository = open_repo(&path)?;
     fetch_default_remote(&repository)?;
+    build_repository_status(&mut repository)
+}
+
+#[tauri::command]
+fn pull_current_branch(path: String) -> Result<GitStatusResponse, String> {
+    let mut repository = open_repo(&path)?;
+    pull_current_branch_ff_only(&repository)?;
+    build_repository_status(&mut repository)
+}
+
+#[tauri::command]
+fn push_current_branch(path: String) -> Result<GitStatusResponse, String> {
+    let mut repository = open_repo(&path)?;
+    push_current_branch_to_origin(&repository)?;
     build_repository_status(&mut repository)
 }
 
@@ -211,11 +226,13 @@ fn build_repository_status(repository: &mut Repository) -> Result<GitStatusRespo
     let tags = load_tags(repository)?;
     let stashes = load_stashes(repository)?;
     let submodules = load_submodules(repository)?;
+    let has_origin_remote = has_remote(repository, "origin")?;
 
     Ok(GitStatusResponse {
         repo_name,
         repo_path,
         branch,
+        has_origin_remote,
         is_clean: entries.is_empty(),
         entries,
         head_summary,
@@ -301,6 +318,71 @@ fn fetch_default_remote(repository: &Repository) -> Result<(), String> {
     remote
         .fetch(&[] as &[&str], Some(&mut fetch_options), None)
         .map_err(|error| format!("Fetch に失敗しました: {}", error.message()))?;
+
+    Ok(())
+}
+
+fn pull_current_branch_ff_only(repository: &Repository) -> Result<(), String> {
+    let repo_root = repository_root(repository)?;
+
+    let output = Command::new("git")
+        .current_dir(repo_root)
+        .arg("pull")
+        .arg("--ff-only")
+        .output()
+        .map_err(|error| format!("Failed to run git pull: {}", error))?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+        let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
+        let detail = if !stderr.is_empty() {
+            stderr
+        } else if !stdout.is_empty() {
+            stdout
+        } else {
+            "git pull failed without output".to_string()
+        };
+
+        return Err(format!("git pull failed: {detail}"));
+    }
+
+    Ok(())
+}
+
+fn push_current_branch_to_origin(repository: &Repository) -> Result<(), String> {
+    if !has_remote(repository, "origin")? {
+        return Err("origin remote is not configured".to_string());
+    }
+
+    let branch = repository
+        .head()
+        .ok()
+        .and_then(|head| head.shorthand().map(ToOwned::to_owned))
+        .filter(|name| !name.is_empty() && name != "HEAD")
+        .ok_or_else(|| "current branch could not be determined".to_string())?;
+
+    let output = Command::new("git")
+        .current_dir(repository_root(repository)?)
+        .arg("push")
+        .arg("-u")
+        .arg("origin")
+        .arg(&branch)
+        .output()
+        .map_err(|error| format!("Failed to run git push: {}", error))?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+        let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
+        let detail = if !stderr.is_empty() {
+            stderr
+        } else if !stdout.is_empty() {
+            stdout
+        } else {
+            "git push failed without output".to_string()
+        };
+
+        return Err(format!("git push failed: {detail}"));
+    }
 
     Ok(())
 }
@@ -432,6 +514,14 @@ fn repository_root(repository: &Repository) -> Result<PathBuf, String> {
         .or_else(|| repository.path().parent())
         .ok_or_else(|| "リポジトリのルートパスを解決できませんでした。".to_string())
         .map(|path| path.to_path_buf())
+}
+
+fn has_remote(repository: &Repository, remote_name: &str) -> Result<bool, String> {
+    let remotes = repository
+        .remotes()
+        .map_err(|error| format!("failed to inspect remotes: {}", error.message()))?;
+
+    Ok(remotes.iter().flatten().any(|name| name == remote_name))
 }
 
 fn tree_is_unchanged(
@@ -807,6 +897,8 @@ pub fn run() {
             get_repository_status,
             commit_all,
             fetch_origin,
+            pull_current_branch,
+            push_current_branch,
             stash_changes,
             apply_stash,
             pop_stash,

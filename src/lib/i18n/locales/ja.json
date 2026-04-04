@@ -21,6 +21,12 @@
     "refresh": "Refresh",
     "syncing": "Syncing..."
   },
+  "push": {
+    "missingOriginTitle": "origin が未設定です",
+    "missingOriginMessage": "このリポジトリには origin リモートがありません。push の前に origin を設定してください。",
+    "dialogOk": "OK",
+    "dialogCancel": "キャンセル"
+  },
   "sidebar": {
     "refs": "Refs",
     "open": "Open",
