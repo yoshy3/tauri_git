@@ -1,6 +1,6 @@
 use git2::{Repository, Signature, Status, StatusOptions};
 use serde::Serialize;
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::path::PathBuf;
 
 #[derive(Serialize)]
@@ -19,6 +19,28 @@ struct GitStatusResponse {
     entries: Vec<GitStatusEntry>,
     head_summary: Option<String>,
     local_branches: Vec<String>,
+    remote_groups: Vec<GitRemoteGroup>,
+    tags: Vec<String>,
+    stashes: Vec<GitStashEntry>,
+    submodules: Vec<GitSubmoduleEntry>,
+}
+
+#[derive(Serialize)]
+struct GitRemoteGroup {
+    name: String,
+    branches: Vec<String>,
+}
+
+#[derive(Serialize)]
+struct GitStashEntry {
+    name: String,
+    message: String,
+}
+
+#[derive(Serialize)]
+struct GitSubmoduleEntry {
+    name: String,
+    path: String,
 }
 
 #[derive(Serialize)]
@@ -53,15 +75,15 @@ fn open_repository(path: String) -> Result<GitStatusResponse, String> {
 
 #[tauri::command]
 fn get_repository_status(path: String) -> Result<GitStatusResponse, String> {
-    let repository = open_repo(&path)?;
-    build_repository_status(&repository)
+    let mut repository = open_repo(&path)?;
+    build_repository_status(&mut repository)
 }
 
 #[tauri::command]
 fn commit_all(path: String, message: String) -> Result<GitStatusResponse, String> {
-    let repository = open_repo(&path)?;
+    let mut repository = open_repo(&path)?;
     create_commit(&repository, &message)?;
-    build_repository_status(&repository)
+    build_repository_status(&mut repository)
 }
 
 #[tauri::command]
@@ -85,16 +107,18 @@ fn open_repo(path: &str) -> Result<Repository, String> {
     })
 }
 
-fn build_repository_status(repository: &Repository) -> Result<GitStatusResponse, String> {
+fn build_repository_status(repository: &mut Repository) -> Result<GitStatusResponse, String> {
     let repo_root = repository
         .workdir()
         .or_else(|| repository.path().parent())
-        .ok_or_else(|| "リポジトリのルートパスを解決できませんでした。".to_string())?;
+        .ok_or_else(|| "リポジトリのルートパスを解決できませんでした。".to_string())?
+        .to_path_buf();
     let repo_name = repo_root
         .file_name()
         .and_then(|name| name.to_str())
         .unwrap_or("repository")
         .to_string();
+    let repo_path = repo_root.display().to_string();
 
     let mut status_options = StatusOptions::new();
     status_options
@@ -128,6 +152,7 @@ fn build_repository_status(repository: &Repository) -> Result<GitStatusResponse,
     }
 
     entries.sort_by(|left, right| left.path.cmp(&right.path));
+    drop(statuses);
 
     let branch = repository
         .head()
@@ -152,15 +177,23 @@ fn build_repository_status(repository: &Repository) -> Result<GitStatusResponse,
         });
 
     let local_branches = load_local_branches(repository)?;
+    let remote_groups = load_remote_groups(repository)?;
+    let tags = load_tags(repository)?;
+    let stashes = load_stashes(repository)?;
+    let submodules = load_submodules(repository)?;
 
     Ok(GitStatusResponse {
         repo_name,
-        repo_path: repo_root.display().to_string(),
+        repo_path,
         branch,
         is_clean: entries.is_empty(),
         entries,
         head_summary,
         local_branches,
+        remote_groups,
+        tags,
+        stashes,
+        submodules,
     })
 }
 
@@ -459,6 +492,104 @@ fn load_local_branches(repository: &Repository) -> Result<Vec<String>, String> {
 
     names.sort();
     Ok(names)
+}
+
+fn load_remote_groups(repository: &Repository) -> Result<Vec<GitRemoteGroup>, String> {
+    let branches = repository
+        .branches(Some(git2::BranchType::Remote))
+        .map_err(|error| format!("リモートブランチ一覧を取得できませんでした: {}", error.message()))?;
+
+    let mut grouped = BTreeMap::<String, Vec<String>>::new();
+
+    for branch_result in branches {
+        let (branch, _) = branch_result
+            .map_err(|error| format!("リモートブランチ情報を読み込めませんでした: {}", error.message()))?;
+        let Some(name) = branch
+            .name()
+            .map_err(|error| format!("リモートブランチ名を取得できませんでした: {}", error.message()))?
+        else {
+            continue;
+        };
+
+        if name.ends_with("/HEAD") {
+            continue;
+        }
+
+        let Some((remote_name, branch_name)) = name.split_once('/') else {
+            continue;
+        };
+
+        grouped
+            .entry(remote_name.to_string())
+            .or_default()
+            .push(branch_name.to_string());
+    }
+
+    Ok(grouped
+        .into_iter()
+        .map(|(name, mut branches)| {
+            branches.sort();
+            branches.dedup();
+            GitRemoteGroup { name, branches }
+        })
+        .collect())
+}
+
+fn load_tags(repository: &Repository) -> Result<Vec<String>, String> {
+    let tag_names = repository
+        .tag_names(None)
+        .map_err(|error| format!("タグ一覧を取得できませんでした: {}", error.message()))?;
+
+    let mut tags = tag_names
+        .iter()
+        .flatten()
+        .map(ToOwned::to_owned)
+        .collect::<Vec<_>>();
+
+    tags.sort();
+    Ok(tags)
+}
+
+fn load_stashes(repository: &mut Repository) -> Result<Vec<GitStashEntry>, String> {
+    let mut stashes = Vec::new();
+
+    match repository.stash_foreach(|index, message, _oid| {
+            stashes.push(GitStashEntry {
+                name: format!("stash@{{{index}}}"),
+                message: message.to_string(),
+            });
+            true
+        }) {
+        Ok(()) => {}
+        Err(error) if error.code() == git2::ErrorCode::NotFound => {}
+        Err(error) => {
+            return Err(format!(
+                "stash 一覧を取得できませんでした: {}",
+                error.message()
+            ))
+        }
+    }
+
+    Ok(stashes)
+}
+
+fn load_submodules(repository: &Repository) -> Result<Vec<GitSubmoduleEntry>, String> {
+    let submodules = repository
+        .submodules()
+        .map_err(|error| format!("submodule 一覧を取得できませんでした: {}", error.message()))?;
+
+    let mut entries = submodules
+        .into_iter()
+        .map(|submodule| {
+            let path = submodule.path().display().to_string();
+            let name = submodule.name().unwrap_or(path.as_str()).to_string();
+
+            GitSubmoduleEntry { name, path }
+        })
+        .collect::<Vec<_>>();
+
+    entries.sort_by(|left, right| left.path.cmp(&right.path));
+    Ok(entries)
 }
 
 pub fn run() {
