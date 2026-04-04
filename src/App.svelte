@@ -8,6 +8,7 @@
   let error = "";
   let loading = false;
   let committing = false;
+  let rightPaneExpanded = false;
 
   const topActions = ["Fetch", "Pull", "Push", "Stash", "Pop"];
   const navItems = ["Branches", "Remotes", "Tags", "Stashes"];
@@ -15,6 +16,7 @@
   async function loadRepository() {
     error = "";
     repository = null;
+    rightPaneExpanded = false;
 
     const trimmed = repoPath.trim();
     if (!trimmed) {
@@ -44,6 +46,7 @@
       repository = await invoke("get_repository_status", {
         path: repository.repo_path,
       });
+      rightPaneExpanded = false;
     } catch (message) {
       error = String(message);
     } finally {
@@ -74,6 +77,7 @@
         message,
       });
       repository = updated;
+      rightPaneExpanded = false;
       commitSummary = "";
       commitDescription = "";
     } catch (messageText) {
@@ -138,8 +142,11 @@
     }).format(date);
   }
 
-  $: stagedEntries = selectEntries("staged");
-  $: unstagedEntries = selectEntries("unstaged");
+  function toggleRightPane() {
+    rightPaneExpanded = !rightPaneExpanded;
+  }
+
+  $: changedEntries = repository ? repository.entries : [];
 </script>
 
 <svelte:head>
@@ -168,7 +175,7 @@
     </div>
   </header>
 
-  <main class="workspace">
+  <main class:workspace-collapsed={!rightPaneExpanded} class="workspace">
     <aside class="sidebar">
       <section class="repo-card">
         <p class="sidebar-label">Repository</p>
@@ -313,42 +320,34 @@
       </section>
     </section>
 
-    <aside class="right-pane">
-      <section class="changes-panel">
-        <div class="changes-group">
-          <div class="changes-head">
-            <h2>Unstaged ({unstagedEntries.length})</h2>
-            <button disabled>Stage all</button>
-          </div>
+    <aside class:collapsed-pane={!rightPaneExpanded} class="right-pane">
+      <button
+        class:attention={changedEntries.length > 0}
+        class="pane-toggle"
+        on:click={toggleRightPane}
+      >
+        <span class="pane-toggle-label">
+          {rightPaneExpanded ? "Close Commit Panel" : changedEntries.length > 0 ? `Open Commit Panel (${changedEntries.length})` : "Open Commit Panel"}
+        </span>
+      </button>
 
-          {#if unstagedEntries.length > 0}
-            <ul>
-              {#each unstagedEntries as entry}
-                <li>
-                  <span class="file-status warning">{statusLabel(entry)}</span>
-                  <div>
-                    <strong>{shortPath(entry.path)}</strong>
-                    <p>{entry.path}</p>
-                  </div>
-                </li>
-              {/each}
-            </ul>
-          {:else}
-            <p class="empty-side">未ステージの変更はありません。</p>
-          {/if}
+      {#if rightPaneExpanded}
+      <section class="changes-panel">
+        <div class="changes-summary">
+          <div class="changes-summary-copy">
+            <h2>Commit Files ({changedEntries.length})</h2>
+            <p class="changes-caption">変更は自動でステージしてまとめてコミットします</p>
+          </div>
         </div>
 
-        <div class="changes-group">
-          <div class="changes-head">
-            <h2>Staged ({stagedEntries.length})</h2>
-            <button disabled>Unstage all</button>
-          </div>
-
-          {#if stagedEntries.length > 0}
+        <div class="changes-group unified">
+          {#if changedEntries.length > 0}
             <ul>
-              {#each stagedEntries as entry}
+              {#each changedEntries as entry}
                 <li>
-                  <span class="file-status ok">{statusLabel(entry)}</span>
+                  <span class:file-status={true} class:warning={entry.working_tree_status !== "."} class:ok={entry.working_tree_status === "."}>
+                    {statusLabel(entry)}
+                  </span>
                   <div>
                     <strong>{shortPath(entry.path)}</strong>
                     <p>{entry.path}</p>
@@ -357,7 +356,7 @@
               {/each}
             </ul>
           {:else}
-            <p class="empty-side">ステージ済みの変更はありません。</p>
+            <p class="empty-side">コミット対象の変更はありません。</p>
           {/if}
         </div>
       </section>
@@ -381,6 +380,7 @@
           {committing ? "Committing..." : `Commit to ${repository ? repository.branch : "branch"}`}
         </button>
       </section>
+      {/if}
     </aside>
   </main>
 </div>
@@ -458,8 +458,7 @@
 
   .toolbar-button,
   .side-nav button,
-  .sidebar-footer button,
-  .changes-head button {
+  .sidebar-footer button {
     background: transparent;
     border: 0;
     color: #8aa0b8;
@@ -489,6 +488,11 @@
     display: grid;
     grid-template-columns: 246px minmax(0, 1fr) 332px;
     overflow: hidden;
+    transition: grid-template-columns 160ms ease;
+  }
+
+  .workspace.workspace-collapsed {
+    grid-template-columns: 246px minmax(0, 1fr) 54px;
   }
 
   .sidebar,
@@ -952,15 +956,89 @@
   .right-pane {
     padding: 12px 12px 12px 0;
     display: grid;
-    grid-template-rows: 1fr auto;
+    grid-template-rows: auto 1fr;
     gap: 10px;
     overflow: hidden;
+    width: 332px;
+    justify-self: end;
+    transition: width 160ms ease, padding 160ms ease;
+  }
+
+  .right-pane.collapsed-pane {
+    width: 54px;
+    padding-left: 0;
+    padding-right: 8px;
+  }
+
+  .pane-toggle {
+    border: 1px solid rgba(120, 148, 177, 0.16);
+    border-radius: 12px;
+    background: rgba(12, 24, 38, 0.96);
+    color: #c7d7e8;
+    min-height: 54px;
+    padding: 10px 12px;
+    text-align: left;
+    font-size: 0.76rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    writing-mode: horizontal-tb;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.02);
+  }
+
+  .collapsed-pane .pane-toggle {
+    height: 100%;
+    min-height: 160px;
+    padding: 14px 8px;
+    writing-mode: vertical-rl;
+    text-orientation: mixed;
+    justify-self: stretch;
+    justify-content: center;
+    border-radius: 10px;
+  }
+
+  .pane-toggle.attention {
+    background: linear-gradient(180deg, rgba(30, 104, 176, 0.92), rgba(13, 87, 160, 0.92));
+    border-color: rgba(104, 173, 244, 0.42);
+    color: #eef6ff;
+    box-shadow: 0 0 0 1px rgba(88, 161, 237, 0.16), 0 8px 20px rgba(15, 88, 160, 0.28);
+  }
+
+  .pane-toggle-label {
+    display: inline-block;
   }
 
   .changes-panel {
     display: grid;
-    grid-template-rows: 1fr 1fr;
+    grid-template-rows: auto 1fr;
     overflow: hidden;
+  }
+
+  .changes-summary {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    padding: 12px;
+    min-height: 68px;
+    box-sizing: border-box;
+  }
+
+  .changes-summary-copy {
+    min-width: 0;
+  }
+
+  .changes-summary h2 {
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+  }
+
+  .changes-caption {
+    margin: 4px 0 0;
+    color: #6f859c;
+    font-size: 0.76rem;
+    line-height: 1.3;
   }
 
   .changes-group {
@@ -968,21 +1046,8 @@
     overflow: auto;
   }
 
-  .changes-group + .changes-group {
+  .changes-group.unified {
     border-top: 1px solid rgba(120, 148, 177, 0.08);
-  }
-
-  .changes-head {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 10px;
-  }
-
-  .changes-head h2 {
-    font-size: 0.8rem;
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
   }
 
   .changes-group li {
@@ -1043,8 +1108,13 @@
   }
 
   .primary:hover:enabled,
-  .new-branch:hover:enabled {
+  .new-branch:hover:enabled,
+  .pane-toggle:hover:enabled {
     transform: translateY(-1px);
+  }
+
+  .primary:hover:enabled,
+  .new-branch:hover:enabled {
     background: linear-gradient(180deg, #2673bf, #1160ae);
   }
 
@@ -1054,12 +1124,28 @@
       grid-template-rows: minmax(0, 1fr) auto;
     }
 
+    .workspace.workspace-collapsed {
+      grid-template-columns: 220px minmax(0, 1fr);
+    }
+
     .right-pane {
       grid-column: 1 / -1;
       padding: 0 16px 16px;
       grid-template-columns: 1fr 320px;
-      grid-template-rows: none;
+      grid-template-rows: auto;
       overflow: auto;
+      width: auto;
+    }
+
+    .right-pane.collapsed-pane {
+      width: auto;
+      padding-left: 16px;
+    }
+
+    .collapsed-pane .pane-toggle {
+      min-height: 54px;
+      writing-mode: horizontal-tb;
+      text-orientation: initial;
     }
   }
 
