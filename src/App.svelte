@@ -122,6 +122,22 @@
     return `${parts.slice(0, 2).join("/")}/.../${parts.at(-1)}`;
   }
 
+  function formatLocalDateTime(value) {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) {
+      return value;
+    }
+
+    return new Intl.DateTimeFormat(undefined, {
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    }).format(date);
+  }
+
   $: stagedEntries = selectEntries("staged");
   $: unstagedEntries = selectEntries("unstaged");
 </script>
@@ -135,7 +151,7 @@
     <div class="brand">
       <span class="brand-mark">G</span>
       <div>
-        <strong>GitPrecision</strong>
+        <strong>Tauri Git</strong>
         <p>Minimal Tauri client</p>
       </div>
     </div>
@@ -157,6 +173,10 @@
       <section class="repo-card">
         <p class="sidebar-label">Repository</p>
         {#if repository}
+          <div class="repo-icon-row">
+            <span class="repo-icon"></span>
+            <span class="repo-chip">mainline</span>
+          </div>
           <h1>{repository.repo_name}</h1>
           <p class="muted">{repository.branch}</p>
           <p class="path">{repository.repo_path}</p>
@@ -230,6 +250,10 @@
         </div>
       </div>
 
+      {#if repository && repository.head_summary}
+        <div class="head-pill">HEAD {repository.head_summary}</div>
+      {/if}
+
       {#if error}
         <div class="banner error-banner">{error}</div>
       {/if}
@@ -239,7 +263,8 @@
           <span>Graph</span>
           <span>Subject</span>
           <span>Author</span>
-          <span>Hash / Date</span>
+          <span>Hash</span>
+          <span>Date</span>
         </div>
 
         {#if repository && repository.recent_commits.length > 0}
@@ -271,7 +296,10 @@
 
                 <div class="hash-cell">
                   <span>{commit.id}</span>
-                  <span>{commit.committed_at}</span>
+                </div>
+
+                <div class="date-cell">
+                  <span>{formatLocalDateTime(commit.committed_at)}</span>
                 </div>
               </li>
             {/each}
@@ -361,25 +389,35 @@
   :global(body) {
     margin: 0;
     background:
-      radial-gradient(circle at top left, rgba(12, 34, 56, 0.55), transparent 20%),
-      linear-gradient(180deg, #08121d 0%, #0e1925 100%);
+      radial-gradient(circle at top left, rgba(18, 49, 82, 0.5), transparent 22%),
+      radial-gradient(circle at bottom right, rgba(16, 38, 64, 0.35), transparent 24%),
+      linear-gradient(180deg, #07111a 0%, #0a1621 100%);
     color: #d5deea;
+    overflow: hidden;
+  }
+
+  :global(html),
+  :global(body),
+  :global(#app) {
+    height: 100%;
   }
 
   .app-shell {
-    min-height: 100vh;
+    height: 100vh;
     display: grid;
     grid-template-rows: 60px 1fr;
+    overflow: hidden;
   }
 
   .topbar {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 0 18px;
-    border-bottom: 1px solid rgba(114, 144, 175, 0.12);
-    background: rgba(6, 14, 23, 0.9);
-    backdrop-filter: blur(18px);
+    padding: 0 14px 0 10px;
+    border-bottom: 1px solid rgba(114, 144, 175, 0.1);
+    background: linear-gradient(180deg, rgba(6, 14, 23, 0.98), rgba(8, 17, 27, 0.93));
+    backdrop-filter: blur(20px);
+    box-shadow: inset 0 -1px 0 rgba(255, 255, 255, 0.02);
   }
 
   .brand {
@@ -390,8 +428,8 @@
 
   .brand strong {
     display: block;
-    font-size: 1.05rem;
-    letter-spacing: 0.02em;
+    font-size: 1.08rem;
+    letter-spacing: 0.01em;
   }
 
   .brand p {
@@ -401,19 +439,20 @@
   }
 
   .brand-mark {
-    width: 30px;
-    height: 30px;
-    border-radius: 9px;
+    width: 32px;
+    height: 32px;
+    border-radius: 10px;
     display: grid;
     place-items: center;
     background: linear-gradient(135deg, #1f5b94, #4ca4ff);
     color: white;
     font-weight: 700;
+    box-shadow: 0 8px 18px rgba(32, 108, 184, 0.28);
   }
 
   .toolbar {
     display: flex;
-    gap: 10px;
+    gap: 2px;
     flex-wrap: wrap;
   }
 
@@ -427,18 +466,29 @@
     text-transform: uppercase;
     letter-spacing: 0.08em;
     font-size: 0.72rem;
+    padding: 10px 12px;
+    border-radius: 8px;
+  }
+
+  .toolbar-button:hover:enabled,
+  .side-nav button:hover:enabled,
+  .sidebar-footer button:hover:enabled {
+    background: rgba(255, 255, 255, 0.03);
+    color: #dce8f4;
   }
 
   .toolbar-button.active {
     color: #f2f7fb;
-    border-bottom: 2px solid #4da0ff;
-    padding-bottom: 8px;
+    background: rgba(32, 84, 138, 0.22);
+    box-shadow: inset 0 -2px 0 #4da0ff;
   }
 
   .workspace {
     min-height: 0;
+    height: 100%;
     display: grid;
-    grid-template-columns: 240px minmax(0, 1fr) 320px;
+    grid-template-columns: 246px minmax(0, 1fr) 332px;
+    overflow: hidden;
   }
 
   .sidebar,
@@ -448,12 +498,13 @@
   }
 
   .sidebar {
-    padding: 16px 12px;
-    border-right: 1px solid rgba(114, 144, 175, 0.08);
-    background: rgba(8, 18, 29, 0.92);
+    padding: 8px 8px 10px;
+    border-right: 1px solid rgba(114, 144, 175, 0.06);
+    background: linear-gradient(180deg, rgba(8, 18, 29, 0.96), rgba(8, 16, 25, 0.92));
     display: grid;
     grid-template-rows: auto auto auto auto 1fr auto;
-    gap: 14px;
+    gap: 8px;
+    overflow: auto;
   }
 
   .repo-card,
@@ -462,24 +513,25 @@
   .changes-panel,
   .commit-panel,
   .history-table {
-    background: rgba(12, 24, 38, 0.92);
-    border: 1px solid rgba(120, 148, 177, 0.1);
-    border-radius: 12px;
+    background: linear-gradient(180deg, rgba(11, 23, 36, 0.98), rgba(11, 22, 34, 0.95));
+    border: 1px solid rgba(120, 148, 177, 0.08);
+    border-radius: 10px;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.02);
   }
 
   .repo-card,
   .open-panel,
   .branch-panel,
   .commit-panel {
-    padding: 14px;
+    padding: 10px;
   }
 
   .sidebar-label {
-    margin: 0 0 8px;
-    color: #6f859c;
-    font-size: 0.7rem;
+    margin: 0 0 5px;
+    color: #5f7891;
+    font-size: 0.68rem;
     text-transform: uppercase;
-    letter-spacing: 0.1em;
+    letter-spacing: 0.12em;
   }
 
   h1,
@@ -490,25 +542,50 @@
   }
 
   .repo-card h1 {
-    font-size: 1.1rem;
+    font-size: 1.08rem;
+    margin-top: 5px;
   }
 
   .muted,
   .path,
   .empty-side {
-    color: #7088a2;
+    color: #6c849c;
   }
 
   .path {
-    font-size: 0.78rem;
-    line-height: 1.5;
+    font-size: 0.75rem;
+    line-height: 1.35;
     word-break: break-all;
+  }
+
+  .repo-icon-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .repo-icon {
+    width: 16px;
+    height: 16px;
+    border-radius: 4px;
+    background: linear-gradient(180deg, #3d6ea3, #1d4875);
+    box-shadow: 0 0 0 1px rgba(126, 164, 201, 0.18);
+  }
+
+  .repo-chip {
+    padding: 2px 7px;
+    border-radius: 999px;
+    background: rgba(55, 88, 119, 0.45);
+    color: #bcd0e5;
+    font-size: 0.68rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
   }
 
   .open-panel label,
   .commit-panel label {
     display: grid;
-    gap: 7px;
+    gap: 5px;
   }
 
   .open-panel span,
@@ -521,11 +598,20 @@
   textarea {
     width: 100%;
     box-sizing: border-box;
-    border: 1px solid rgba(120, 148, 177, 0.14);
+    border: 1px solid rgba(120, 148, 177, 0.12);
     border-radius: 8px;
-    background: #050b11;
+    background: #040a10;
     color: #e8eef5;
     padding: 11px 12px;
+    transition: border-color 120ms ease, box-shadow 120ms ease, background 120ms ease;
+  }
+
+  input:focus,
+  textarea:focus {
+    outline: none;
+    border-color: rgba(84, 155, 233, 0.7);
+    box-shadow: 0 0 0 3px rgba(35, 101, 168, 0.18);
+    background: #06101a;
   }
 
   textarea {
@@ -540,42 +626,46 @@
     color: #eef5ff;
     font-weight: 700;
     letter-spacing: 0.03em;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12);
   }
 
   .wide {
     width: 100%;
-    padding: 12px 14px;
-    margin-top: 12px;
+    padding: 10px 12px;
+    margin-top: 8px;
   }
 
   .new-branch {
-    padding: 12px 14px;
+    padding: 10px 12px;
     text-transform: uppercase;
     font-size: 0.78rem;
+    border-radius: 6px;
   }
 
   .side-nav {
     display: grid;
-    gap: 4px;
+    gap: 2px;
   }
 
   .side-nav button {
     text-align: left;
-    padding: 10px 12px;
-    border-radius: 8px;
+    padding: 8px 10px;
+    border-radius: 6px;
     text-transform: none;
     letter-spacing: 0;
     font-size: 0.9rem;
+    position: relative;
   }
 
   .side-nav button.item-active {
-    background: rgba(28, 92, 157, 0.35);
+    background: linear-gradient(180deg, rgba(25, 74, 126, 0.5), rgba(20, 62, 106, 0.45));
     color: #f1f7ff;
+    box-shadow: inset 3px 0 0 #4da0ff;
   }
 
   .branch-panel {
     display: grid;
-    gap: 10px;
+    gap: 6px;
   }
 
   .branch-list,
@@ -588,7 +678,7 @@
 
   .branch-list {
     display: grid;
-    gap: 8px;
+    gap: 2px;
   }
 
   .branch-list li {
@@ -596,7 +686,8 @@
     align-items: center;
     gap: 9px;
     color: #a8bbcf;
-    font-size: 0.92rem;
+    font-size: 0.87rem;
+    padding: 3px 2px;
   }
 
   .branch-list li.current-branch {
@@ -612,23 +703,26 @@
 
   .sidebar-footer {
     display: grid;
-    gap: 6px;
+    gap: 2px;
     align-self: end;
   }
 
   .sidebar-footer button {
     text-align: left;
-    padding: 8px 4px;
-    font-size: 0.86rem;
+    padding: 6px 4px;
+    font-size: 0.82rem;
     letter-spacing: 0;
   }
 
   .center-pane {
-    padding: 16px;
+    padding: 12px;
     display: grid;
     grid-template-rows: auto auto 1fr;
-    gap: 14px;
+    gap: 10px;
     min-width: 0;
+    min-height: 0;
+    background: linear-gradient(180deg, rgba(11, 22, 34, 0.6), rgba(10, 20, 31, 0.36));
+    overflow: hidden;
   }
 
   .history-toolbar {
@@ -636,17 +730,30 @@
     justify-content: space-between;
     gap: 12px;
     align-items: center;
+    padding: 2px 2px 0;
   }
 
   .search {
     max-width: 520px;
+    border-radius: 6px;
+    background: #04080d;
   }
 
   .history-meta {
     display: flex;
     gap: 12px;
-    color: #6f859c;
+    color: #688099;
     font-size: 0.85rem;
+  }
+
+  .head-pill {
+    align-self: start;
+    padding: 6px 10px;
+    border-radius: 999px;
+    background: rgba(23, 44, 66, 0.76);
+    color: #a9c1d8;
+    font-size: 0.76rem;
+    border: 1px solid rgba(96, 132, 169, 0.14);
   }
 
   .banner {
@@ -665,23 +772,25 @@
     display: grid;
     grid-template-rows: auto 1fr;
     min-height: 0;
+    border-radius: 8px;
   }
 
   .history-head,
   .history-rows li {
     display: grid;
-    grid-template-columns: 72px minmax(0, 1.5fr) minmax(140px, 0.8fr) 150px;
+    grid-template-columns: 72px minmax(0, 1.5fr) minmax(140px, 0.8fr) 92px 132px;
     gap: 14px;
     align-items: center;
   }
 
   .history-head {
-    padding: 12px 18px;
-    color: #6f859c;
-    font-size: 0.72rem;
+    padding: 8px 14px;
+    color: #60788f;
+    font-size: 0.68rem;
     text-transform: uppercase;
-    letter-spacing: 0.08em;
-    border-bottom: 1px solid rgba(120, 148, 177, 0.08);
+    letter-spacing: 0.1em;
+    border-bottom: 1px solid rgba(120, 148, 177, 0.06);
+    background: rgba(8, 16, 25, 0.55);
   }
 
   .history-rows {
@@ -689,13 +798,21 @@
   }
 
   .history-rows li {
-    padding: 14px 18px;
-    border-bottom: 1px solid rgba(120, 148, 177, 0.05);
+    padding: 8px 14px;
+    border-bottom: 1px solid rgba(120, 148, 177, 0.04);
+    transition: background 120ms ease;
+    height: 40px;
+    box-sizing: border-box;
+    overflow: hidden;
+  }
+
+  .history-rows li:hover {
+    background: rgba(255, 255, 255, 0.02);
   }
 
   .graph-cell {
     position: relative;
-    min-height: 40px;
+    height: 24px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -705,18 +822,18 @@
   .graph-tail {
     position: absolute;
     width: 2px;
-    background: rgba(110, 143, 176, 0.55);
+    background: rgba(110, 143, 176, 0.38);
     left: calc(50% - 1px);
   }
 
   .graph-line {
-    top: -14px;
-    height: 16px;
+    top: -8px;
+    height: 10px;
   }
 
   .graph-tail {
-    top: 20px;
-    bottom: -14px;
+    top: 16px;
+    bottom: -8px;
   }
 
   .graph-node {
@@ -725,36 +842,46 @@
     border-radius: 999px;
     background: #ffb54a;
     z-index: 1;
+    box-shadow: 0 0 0 4px rgba(255, 181, 74, 0.08);
   }
 
   .graph-node.graph-node-main {
     width: 10px;
     height: 10px;
     background: #66b0ff;
+    box-shadow: 0 0 0 4px rgba(102, 176, 255, 0.1);
   }
 
   .subject-cell {
     min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    overflow: hidden;
   }
 
   .subject-cell strong {
     display: block;
     color: #eef5fb;
+    line-height: 1;
+    font-size: 0.89rem;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    flex: 1;
   }
 
   .history-tags {
     display: flex;
     gap: 6px;
-    margin-top: 6px;
+    margin-top: 0;
+    flex-shrink: 0;
   }
 
   .history-tags span {
     padding: 3px 7px;
     border-radius: 999px;
-    background: rgba(43, 71, 98, 0.85);
+    background: rgba(43, 71, 98, 0.72);
     color: #c7d9eb;
     font-size: 0.68rem;
     text-transform: uppercase;
@@ -763,27 +890,59 @@
   .author-cell {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 8px;
     min-width: 0;
+    font-size: 0.84rem;
+    overflow: hidden;
+  }
+
+  .author-cell span:last-child {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .avatar {
-    width: 26px;
-    height: 26px;
+    width: 22px;
+    height: 22px;
+    flex-shrink: 0;
     border-radius: 999px;
     display: grid;
     place-items: center;
     background: linear-gradient(135deg, #2b6aa8, #70b8ff);
     color: #fff;
-    font-size: 0.74rem;
+    font-size: 0.68rem;
     font-weight: 700;
   }
 
   .hash-cell {
-    display: grid;
-    gap: 2px;
+    display: flex;
+    align-items: center;
     color: #7990a7;
-    font-size: 0.82rem;
+    font-size: 0.76rem;
+    overflow: hidden;
+  }
+
+  .hash-cell span {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+  }
+
+  .date-cell {
+    display: flex;
+    align-items: center;
+    color: #7990a7;
+    font-size: 0.76rem;
+    overflow: hidden;
+  }
+
+  .date-cell span {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
   }
 
   .empty-history {
@@ -791,10 +950,11 @@
   }
 
   .right-pane {
-    padding: 16px 16px 16px 0;
+    padding: 12px 12px 12px 0;
     display: grid;
     grid-template-rows: 1fr auto;
-    gap: 14px;
+    gap: 10px;
+    overflow: hidden;
   }
 
   .changes-panel {
@@ -820,9 +980,9 @@
   }
 
   .changes-head h2 {
-    font-size: 0.86rem;
+    font-size: 0.8rem;
     text-transform: uppercase;
-    letter-spacing: 0.08em;
+    letter-spacing: 0.1em;
   }
 
   .changes-group li {
@@ -830,8 +990,8 @@
     grid-template-columns: auto 1fr;
     gap: 10px;
     align-items: start;
-    padding: 10px 0;
-    border-bottom: 1px solid rgba(120, 148, 177, 0.05);
+    padding: 10px 2px;
+    border-bottom: 1px solid rgba(120, 148, 177, 0.04);
   }
 
   .changes-group strong {
@@ -852,7 +1012,7 @@
     border-radius: 999px;
     padding: 4px 8px;
     text-align: center;
-    font-size: 0.72rem;
+    font-size: 0.68rem;
     font-weight: 700;
   }
 
@@ -869,6 +1029,8 @@
   .commit-panel {
     display: grid;
     gap: 12px;
+    border-radius: 8px;
+    overflow: auto;
   }
 
   button:disabled {
@@ -876,9 +1038,20 @@
     cursor: not-allowed;
   }
 
+  button {
+    transition: background 120ms ease, color 120ms ease, opacity 120ms ease, transform 120ms ease;
+  }
+
+  .primary:hover:enabled,
+  .new-branch:hover:enabled {
+    transform: translateY(-1px);
+    background: linear-gradient(180deg, #2673bf, #1160ae);
+  }
+
   @media (max-width: 1180px) {
     .workspace {
       grid-template-columns: 220px minmax(0, 1fr);
+      grid-template-rows: minmax(0, 1fr) auto;
     }
 
     .right-pane {
@@ -886,12 +1059,16 @@
       padding: 0 16px 16px;
       grid-template-columns: 1fr 320px;
       grid-template-rows: none;
+      overflow: auto;
     }
   }
 
   @media (max-width: 860px) {
     .app-shell {
+      height: auto;
+      min-height: 100vh;
       grid-template-rows: auto 1fr;
+      overflow: auto;
     }
 
     .topbar,
@@ -902,6 +1079,8 @@
 
     .workspace {
       grid-template-columns: 1fr;
+      height: auto;
+      overflow: visible;
     }
 
     .right-pane,
@@ -912,6 +1091,7 @@
 
     .right-pane {
       grid-template-columns: 1fr;
+      overflow: visible;
     }
 
     .history-head,
@@ -919,10 +1099,17 @@
       grid-template-columns: 48px minmax(0, 1fr);
     }
 
+    .history-rows li {
+      height: 36px;
+      padding: 6px 10px;
+    }
+
     .history-head span:nth-child(3),
     .history-head span:nth-child(4),
+    .history-head span:nth-child(5),
     .author-cell,
-    .hash-cell {
+    .hash-cell,
+    .date-cell {
       display: none;
     }
   }

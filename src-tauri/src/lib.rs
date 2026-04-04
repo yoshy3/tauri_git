@@ -263,7 +263,7 @@ fn load_recent_commits(
 
         let timestamp = commit.time().seconds();
         let committed_at = chrono::DateTime::from_timestamp(timestamp, 0)
-            .map(|datetime| datetime.format("%Y-%m-%d %H:%M:%S UTC").to_string())
+            .map(|datetime| datetime.format("%Y-%m-%dT%H:%M:%S").to_string())
             .unwrap_or_else(|| "unknown time".to_string());
 
         commits.push(GitCommitSummary {
