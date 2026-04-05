@@ -41,6 +41,20 @@ Tauri Git is a desktop Git client focused on a compact workflow:
 - Optional force delete for unmerged local branches
 - English / Japanese UI switching
 
+## macOS Release Build Note
+
+Unsigned or non-notarized macOS builds may be blocked by Gatekeeper with a message such as "The app is damaged and can't be opened."
+
+If you trust the downloaded release, move `Tauri Git.app` into `Applications` and remove the quarantine attribute:
+
+```bash
+xattr -dr com.apple.quarantine "/Applications/Tauri Git.app"
+```
+
+After that, launch the app again.
+
+Only do this for releases you trust. If the app still does not open, the downloaded file itself may be corrupted.
+
 ## Development
 
 ### Prerequisites
