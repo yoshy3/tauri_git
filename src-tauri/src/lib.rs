@@ -3,6 +3,7 @@ use serde::Serialize;
 use std::collections::{BTreeMap, HashMap};
 use std::path::PathBuf;
 use std::process::Command;
+use tauri::Manager;
 
 #[derive(Serialize)]
 struct GitStatusEntry {
@@ -1158,6 +1159,12 @@ fn load_submodules(repository: &Repository) -> Result<Vec<GitSubmoduleEntry>, St
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
+        .setup(|app| {
+            let window = app.get_webview_window("main").unwrap();
+            let title = format!("Tauri Git v{}", env!("CARGO_PKG_VERSION"));
+            window.set_title(&title)?;
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             open_repository,
             get_repository_status,
