@@ -41,7 +41,9 @@ Tauri Git is a desktop Git client focused on a compact workflow:
 - Optional force delete for unmerged local branches
 - English / Japanese UI switching
 
-## macOS Release Build Note
+## Release Build Notes
+
+### macOS
 
 Unsigned or non-notarized macOS builds may be blocked by Gatekeeper with a message such as "The app is damaged and can't be opened."
 
@@ -54,6 +56,18 @@ xattr -dr com.apple.quarantine "/Applications/Tauri Git.app"
 After that, launch the app again.
 
 Only do this for releases you trust. If the app still does not open, the downloaded file itself may be corrupted.
+
+### Windows
+
+On Windows, Microsoft Defender SmartScreen may show a warning such as "Windows protected your PC" when launching a downloaded release.
+
+If you trust the downloaded release, use this flow:
+
+1. Click `More info`.
+2. Confirm that the publisher and file name match the release you downloaded.
+3. Click `Run anyway`.
+
+Only do this for releases you trust. If the warning appears for a file from an unexpected source, cancel the launch and verify the download first.
 
 ## Development
 
