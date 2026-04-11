@@ -1,5 +1,6 @@
 <script>
   import { _ } from "svelte-i18n";
+  import DiffCompareDialog from "./DiffCompareDialog.svelte";
 
   export let repository = null;
   export let changedEntries = [];
@@ -15,6 +16,7 @@
   export let onDiscard = async () => false;
   export let onCommit = async () => false;
   export let onCommitAndPush = async () => false;
+  export let onLoadCompareDiff = async () => null;
 
   let commitSummary = "";
   let commitDescription = "";
@@ -23,6 +25,11 @@
   let discardSelectedPaths = [];
   let currentRepoPath = "";
   let currentChangeSelectionKey = "";
+  let compareDialogOpen = false;
+  let compareDialogLoading = false;
+  let compareDialogFilePath = "";
+  let compareDialogPatchText = "";
+  let compareDialogStatus = "";
 
   function statusLabel(entry) {
     const staged = entry.index_status === "." ? "" : entry.index_status;
@@ -42,6 +49,35 @@
     }
 
     return `${parts.slice(0, 2).join("/")}/.../${parts.at(-1)}`;
+  }
+
+  async function handleCompare(entry) {
+    compareDialogFilePath = entry.path;
+    compareDialogPatchText = "";
+    compareDialogStatus = statusLabel(entry);
+    compareDialogLoading = true;
+    compareDialogOpen = true;
+
+    const diff = await onLoadCompareDiff(entry);
+
+    if (!diff) {
+      compareDialogLoading = false;
+      compareDialogOpen = false;
+      return;
+    }
+
+    compareDialogFilePath = diff.path || entry.path;
+    compareDialogPatchText = diff.patch || "";
+    compareDialogStatus = statusLabel(entry);
+    compareDialogLoading = false;
+  }
+
+  function closeCompareDialog() {
+    compareDialogOpen = false;
+    compareDialogLoading = false;
+    compareDialogFilePath = "";
+    compareDialogPatchText = "";
+    compareDialogStatus = "";
   }
 
   async function handleCommit() {
@@ -186,6 +222,9 @@
         ? preservedDiscardPaths
         : [...changedEntryPaths];
   }
+  $: if (!expanded) {
+    closeCompareDialog();
+  }
 </script>
 
 <aside class:collapsed-pane={!expanded} class="right-pane">
@@ -254,6 +293,9 @@
                   <div>
                     <strong title={entry.path}>{entry.path}</strong>
                   </div>
+                  <button class="compare-button" type="button" on:click={() => handleCompare(entry)}>
+                    {$_("history.details.compare")}
+                  </button>
                 </li>
               {/each}
             </ul>
@@ -419,6 +461,14 @@
   {/if}
 </aside>
 
+<DiffCompareDialog
+  open={compareDialogOpen}
+  filePath={compareDialogFilePath}
+  patchText={compareDialogPatchText}
+  status={compareDialogStatus}
+  onClose={closeCompareDialog}
+/>
+
 <style>
   .right-pane {
     min-height: 0;
@@ -547,9 +597,9 @@
 
   .changes-group li {
     display: grid;
-    grid-template-columns: auto 1fr;
+    grid-template-columns: auto minmax(0, 1fr) auto;
     gap: 10px;
-    align-items: start;
+    align-items: center;
     padding: 10px 2px;
     border-bottom: 1px solid rgba(120, 148, 177, 0.04);
   }
@@ -561,6 +611,24 @@
     line-height: 1.35;
     color: #6f859c;
     word-break: break-all;
+  }
+
+  .compare-button {
+    border: 1px solid rgba(120, 148, 177, 0.14);
+    border-radius: 7px;
+    background: rgba(12, 23, 35, 0.82);
+    color: #d5e4f3;
+    padding: 6px 10px;
+    font-size: 0.71rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+
+  .compare-button:hover {
+    background: rgba(18, 37, 56, 0.92);
+    border-color: rgba(89, 162, 238, 0.3);
   }
 
   .empty-side {

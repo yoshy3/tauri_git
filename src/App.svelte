@@ -682,6 +682,25 @@
     selectedCommitDetail = null;
     selectedCommitDetailLoading = false;
   }
+
+  async function loadWorktreeCompareDiff(entry) {
+    if (!repository || !entry?.path) {
+      error = t("errors.openRepositoryFirst");
+      return null;
+    }
+
+    error = "";
+
+    try {
+      return await invoke("get_worktree_file_diff", {
+        path: repository.repo_path,
+        filePath: entry.path,
+      });
+    } catch (message) {
+      error = String(message);
+      return null;
+    }
+  }
 </script>
 
 <svelte:head>
@@ -746,6 +765,7 @@
       onDiscard={discardChanges}
       onCommit={commitChanges}
       onCommitAndPush={commitAndPushChanges}
+      onLoadCompareDiff={loadWorktreeCompareDiff}
     />
   </main>
 

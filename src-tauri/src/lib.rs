@@ -108,6 +108,12 @@ struct GitCommitFileDiff {
     patch: String,
 }
 
+#[derive(Serialize)]
+struct GitWorktreeFileDiff {
+    path: String,
+    patch: String,
+}
+
 #[tauri::command]
 fn open_repository(path: String) -> Result<GitStatusResponse, String> {
     get_repository_status(path)
@@ -236,6 +242,12 @@ fn pop_stash(path: String, index: Option<usize>) -> Result<GitStatusResponse, St
     let mut repository = open_repo(&path)?;
     pop_stash_entry(&mut repository, index.unwrap_or(0))?;
     build_repository_status(&mut repository)
+}
+
+#[tauri::command]
+fn get_worktree_file_diff(path: String, file_path: String) -> Result<GitWorktreeFileDiff, String> {
+    let repository = open_repo(&path)?;
+    load_worktree_file_diff(&repository, &file_path)
 }
 
 #[tauri::command]
@@ -968,6 +980,75 @@ fn run_git_command(mut command: Command, action_name: &str) -> Result<(), String
     Err(format!("{action_name} に失敗しました: {detail}"))
 }
 
+fn run_git_diff_command(mut command: Command, action_name: &str) -> Result<String, String> {
+    let output = command
+        .output()
+        .map_err(|error| format!("{action_name} コマンドを実行できませんでした: {}", error))?;
+
+    match output.status.code() {
+        Some(0) | Some(1) => Ok(String::from_utf8_lossy(&output.stdout).to_string()),
+        _ => {
+            let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+            let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
+            let detail = if !stderr.is_empty() {
+                stderr
+            } else if !stdout.is_empty() {
+                stdout
+            } else {
+                "詳細なエラーを取得できませんでした。".to_string()
+            };
+
+            Err(format!("{action_name} に失敗しました: {detail}"))
+        }
+    }
+}
+
+fn load_worktree_file_diff(
+    repository: &Repository,
+    file_path: &str,
+) -> Result<GitWorktreeFileDiff, String> {
+    let repo_root = repository_root(repository)?;
+    let patch = if repository.find_path_in_head(file_path)? {
+        run_git_diff_command(
+            {
+                let mut command = Command::new("git");
+                command
+                    .current_dir(&repo_root)
+                    .arg("diff")
+                    .arg("--no-ext-diff")
+                    .arg("--no-color")
+                    .arg("HEAD")
+                    .arg("--")
+                    .arg(file_path);
+                command
+            },
+            "変更差分の取得",
+        )?
+    } else {
+        run_git_diff_command(
+            {
+                let mut command = Command::new("git");
+                command
+                    .current_dir(&repo_root)
+                    .arg("diff")
+                    .arg("--no-ext-diff")
+                    .arg("--no-color")
+                    .arg("--no-index")
+                    .arg("--")
+                    .arg("/dev/null")
+                    .arg(file_path);
+                command
+            },
+            "新規ファイル差分の取得",
+        )?
+    };
+
+    Ok(GitWorktreeFileDiff {
+        path: file_path.to_string(),
+        patch,
+    })
+}
+
 trait RepositoryHeadExt {
     fn find_path_in_head(&self, path: &str) -> Result<bool, String>;
 }
@@ -1534,6 +1615,7 @@ pub fn run() {
             discard_changes,
             apply_stash,
             pop_stash,
+            get_worktree_file_diff,
             get_commit_history_chunk,
             get_commit_detail
         ])
