@@ -102,6 +102,26 @@ npm run tauri dev
 npm run build
 ```
 
+### 開発中に Windows の release 版を確認する方法
+
+Windows の release 版をローカルで確認したい場合は、次を使ってください。
+
+```bash
+npm run tauri build
+```
+
+ビルド後は次の実行ファイルを起動します。
+
+```powershell
+.\src-tauri\target\release\tauri_git.exe
+```
+
+補足:
+
+- release 動作の確認には `npm run tauri build` を使います。こちらはフロントエンドの成果物を Tauri アプリに正しく同梱します。
+- `cargo build --release` は Rust 側の release コンパイル確認には使えますが、配布用に近いアプリ挙動の確認には向いていません。
+- `cargo build --release` で生成した exe を直接起動すると、`http://localhost:1420` を開こうとして `ERR_CONNECTION_REFUSED` になることがあります。
+
 ## ディレクトリ構成
 
 ```text

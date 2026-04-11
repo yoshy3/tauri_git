@@ -102,6 +102,26 @@ npm run tauri dev
 npm run build
 ```
 
+### Verify a Windows release build during development
+
+If you want to test the Windows release app locally, use:
+
+```bash
+npm run tauri build
+```
+
+Then launch:
+
+```powershell
+.\src-tauri\target\release\tauri_git.exe
+```
+
+Notes:
+
+- Use `npm run tauri build` for release verification. This bundles the built frontend assets into the Tauri app.
+- `cargo build --release` is useful for Rust compile checks, but it is not the right command for verifying the packaged desktop app behavior.
+- If you launch an executable produced by `cargo build --release`, the app may try to open `http://localhost:1420` and show `ERR_CONNECTION_REFUSED`.
+
 ## Project Structure
 
 ```text

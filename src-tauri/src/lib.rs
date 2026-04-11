@@ -4,9 +4,24 @@ use git2::{
 };
 use serde::Serialize;
 use std::collections::{BTreeMap, HashMap};
+#[cfg(windows)]
+use std::os::windows::process::CommandExt;
 use std::path::PathBuf;
 use std::process::Command;
 use tauri::Manager;
+
+#[cfg(windows)]
+const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+
+async fn run_blocking<T, F>(job: F) -> Result<T, String>
+where
+    T: Send + 'static,
+    F: FnOnce() -> Result<T, String> + Send + 'static,
+{
+    tauri::async_runtime::spawn_blocking(job)
+        .await
+        .map_err(|error| format!("バックグラウンド処理の実行に失敗しました: {error}"))?
+}
 
 #[derive(Serialize)]
 struct GitStatusEntry {
@@ -117,65 +132,90 @@ struct GitWorktreeFileDiff {
 }
 
 #[tauri::command]
-fn open_repository(path: String) -> Result<GitStatusResponse, String> {
-    get_repository_status(path)
+async fn open_repository(path: String) -> Result<GitStatusResponse, String> {
+    run_blocking(move || {
+        let mut repository = open_repo(&path)?;
+        build_repository_status(&mut repository)
+    })
+    .await
 }
 
 #[tauri::command]
-fn get_repository_status(path: String) -> Result<GitStatusResponse, String> {
-    let mut repository = open_repo(&path)?;
-    build_repository_status(&mut repository)
+async fn get_repository_status(path: String) -> Result<GitStatusResponse, String> {
+    run_blocking(move || {
+        let mut repository = open_repo(&path)?;
+        build_repository_status(&mut repository)
+    })
+    .await
 }
 
 #[tauri::command]
-fn commit_all(path: String, message: String) -> Result<GitStatusResponse, String> {
-    let mut repository = open_repo(&path)?;
-    create_commit(&repository, &message)?;
-    build_repository_status(&mut repository)
+async fn commit_all(path: String, message: String) -> Result<GitStatusResponse, String> {
+    run_blocking(move || {
+        let mut repository = open_repo(&path)?;
+        create_commit(&repository, &message)?;
+        build_repository_status(&mut repository)
+    })
+    .await
 }
 
 #[tauri::command]
-fn commit_and_push(path: String, message: String) -> Result<GitStatusResponse, String> {
-    let mut repository = open_repo(&path)?;
-    create_commit(&repository, &message)?;
-    push_current_branch_to_origin(&repository)?;
-    build_repository_status(&mut repository)
+async fn commit_and_push(path: String, message: String) -> Result<GitStatusResponse, String> {
+    run_blocking(move || {
+        let mut repository = open_repo(&path)?;
+        create_commit(&repository, &message)?;
+        push_current_branch_to_origin(&repository)?;
+        build_repository_status(&mut repository)
+    })
+    .await
 }
 
 #[tauri::command]
-fn fetch_origin(path: String) -> Result<GitStatusResponse, String> {
-    let mut repository = open_repo(&path)?;
-    fetch_default_remote(&repository)?;
-    build_repository_status(&mut repository)
+async fn fetch_origin(path: String) -> Result<GitStatusResponse, String> {
+    run_blocking(move || {
+        let mut repository = open_repo(&path)?;
+        fetch_default_remote(&repository)?;
+        build_repository_status(&mut repository)
+    })
+    .await
 }
 
 #[tauri::command]
-fn pull_current_branch(path: String) -> Result<GitStatusResponse, String> {
-    let mut repository = open_repo(&path)?;
-    pull_current_branch_ff_only(&repository)?;
-    build_repository_status(&mut repository)
+async fn pull_current_branch(path: String) -> Result<GitStatusResponse, String> {
+    run_blocking(move || {
+        let mut repository = open_repo(&path)?;
+        pull_current_branch_ff_only(&repository)?;
+        build_repository_status(&mut repository)
+    })
+    .await
 }
 
 #[tauri::command]
-fn push_current_branch(path: String) -> Result<GitStatusResponse, String> {
-    let mut repository = open_repo(&path)?;
-    push_current_branch_to_origin(&repository)?;
-    build_repository_status(&mut repository)
+async fn push_current_branch(path: String) -> Result<GitStatusResponse, String> {
+    run_blocking(move || {
+        let mut repository = open_repo(&path)?;
+        push_current_branch_to_origin(&repository)?;
+        build_repository_status(&mut repository)
+    })
+    .await
 }
 
 #[tauri::command]
-fn checkout_branch(
+async fn checkout_branch(
     path: String,
     branch_name: String,
     remote_name: Option<String>,
 ) -> Result<GitStatusResponse, String> {
-    let mut repository = open_repo(&path)?;
-    checkout_repository_branch(&repository, &branch_name, remote_name.as_deref())?;
-    build_repository_status(&mut repository)
+    run_blocking(move || {
+        let mut repository = open_repo(&path)?;
+        checkout_repository_branch(&repository, &branch_name, remote_name.as_deref())?;
+        build_repository_status(&mut repository)
+    })
+    .await
 }
 
 #[tauri::command]
-fn create_branch(
+async fn create_branch(
     path: String,
     branch_name: String,
     source_name: String,
@@ -183,89 +223,119 @@ fn create_branch(
     source_remote_name: Option<String>,
     switch_after_create: bool,
 ) -> Result<GitStatusResponse, String> {
-    let mut repository = open_repo(&path)?;
-    create_branch_from_source(
-        &repository,
-        &branch_name,
-        &source_name,
-        &source_kind,
-        source_remote_name.as_deref(),
-        switch_after_create,
-    )?;
-    build_repository_status(&mut repository)
+    run_blocking(move || {
+        let mut repository = open_repo(&path)?;
+        create_branch_from_source(
+            &repository,
+            &branch_name,
+            &source_name,
+            &source_kind,
+            source_remote_name.as_deref(),
+            switch_after_create,
+        )?;
+        build_repository_status(&mut repository)
+    })
+    .await
 }
 
 #[tauri::command]
-fn delete_branch(
+async fn delete_branch(
     path: String,
     branch_name: String,
     branch_kind: String,
     remote_name: Option<String>,
     force_delete: bool,
 ) -> Result<GitStatusResponse, String> {
-    let mut repository = open_repo(&path)?;
-    delete_repository_branch(
-        &repository,
-        &branch_name,
-        &branch_kind,
-        remote_name.as_deref(),
-        force_delete,
-    )?;
-    build_repository_status(&mut repository)
+    run_blocking(move || {
+        let mut repository = open_repo(&path)?;
+        delete_repository_branch(
+            &repository,
+            &branch_name,
+            &branch_kind,
+            remote_name.as_deref(),
+            force_delete,
+        )?;
+        build_repository_status(&mut repository)
+    })
+    .await
 }
 
 #[tauri::command]
-fn stash_changes(
+async fn stash_changes(
     path: String,
     message: Option<String>,
     selected_paths: Vec<String>,
 ) -> Result<GitStatusResponse, String> {
-    let mut repository = open_repo(&path)?;
-    create_stash(&mut repository, message.as_deref(), &selected_paths)?;
-    build_repository_status(&mut repository)
+    run_blocking(move || {
+        let mut repository = open_repo(&path)?;
+        create_stash(&mut repository, message.as_deref(), &selected_paths)?;
+        build_repository_status(&mut repository)
+    })
+    .await
 }
 
 #[tauri::command]
-fn discard_changes(path: String, selected_paths: Vec<String>) -> Result<GitStatusResponse, String> {
-    let mut repository = open_repo(&path)?;
-    discard_selected_changes(&repository, &selected_paths)?;
-    build_repository_status(&mut repository)
+async fn discard_changes(
+    path: String,
+    selected_paths: Vec<String>,
+) -> Result<GitStatusResponse, String> {
+    run_blocking(move || {
+        let mut repository = open_repo(&path)?;
+        discard_selected_changes(&repository, &selected_paths)?;
+        build_repository_status(&mut repository)
+    })
+    .await
 }
 
 #[tauri::command]
-fn apply_stash(path: String, index: usize) -> Result<GitStatusResponse, String> {
-    let mut repository = open_repo(&path)?;
-    apply_stash_entry(&mut repository, index)?;
-    build_repository_status(&mut repository)
+async fn apply_stash(path: String, index: usize) -> Result<GitStatusResponse, String> {
+    run_blocking(move || {
+        let mut repository = open_repo(&path)?;
+        apply_stash_entry(&mut repository, index)?;
+        build_repository_status(&mut repository)
+    })
+    .await
 }
 
 #[tauri::command]
-fn pop_stash(path: String, index: Option<usize>) -> Result<GitStatusResponse, String> {
-    let mut repository = open_repo(&path)?;
-    pop_stash_entry(&mut repository, index.unwrap_or(0))?;
-    build_repository_status(&mut repository)
+async fn pop_stash(path: String, index: Option<usize>) -> Result<GitStatusResponse, String> {
+    run_blocking(move || {
+        let mut repository = open_repo(&path)?;
+        pop_stash_entry(&mut repository, index.unwrap_or(0))?;
+        build_repository_status(&mut repository)
+    })
+    .await
 }
 
 #[tauri::command]
-fn get_worktree_file_diff(path: String, file_path: String) -> Result<GitWorktreeFileDiff, String> {
-    let repository = open_repo(&path)?;
-    load_worktree_file_diff(&repository, &file_path)
+async fn get_worktree_file_diff(path: String, file_path: String) -> Result<GitWorktreeFileDiff, String> {
+    run_blocking(move || {
+        let repository = open_repo(&path)?;
+        load_worktree_file_diff(&repository, &file_path)
+    })
+    .await
 }
 
 #[tauri::command]
-fn get_commit_history_chunk(
+async fn get_commit_history_chunk(
     path: String,
     offset: usize,
     limit: usize,
 ) -> Result<GitCommitHistoryChunk, String> {
-    let repository = open_repo(&path)?;
-    load_commit_history_chunk(&repository, offset, limit)
+    run_blocking(move || {
+        let repository = open_repo(&path)?;
+        load_commit_history_chunk(&repository, offset, limit)
+    })
+    .await
 }
 
 #[tauri::command]
-fn get_commit_detail(path: String, oid: String) -> Result<GitCommitDetail, String> {
-    let repository = open_repo(&path)?;
-    load_commit_detail(&repository, &oid)
+async fn get_commit_detail(path: String, oid: String) -> Result<GitCommitDetail, String> {
+    run_blocking(move || {
+        let repository = open_repo(&path)?;
+        load_commit_detail(&repository, &oid)
+    })
+    .await
 }
 
 fn open_repo(path: &str) -> Result<Repository, String> {
@@ -456,7 +526,7 @@ fn fetch_default_remote(repository: &Repository) -> Result<(), String> {
 fn pull_current_branch_ff_only(repository: &Repository) -> Result<(), String> {
     let repo_root = repository_root(repository)?;
 
-    let output = Command::new("git")
+    let output = git_command()
         .current_dir(repo_root)
         .arg("pull")
         .arg("--ff-only")
@@ -492,7 +562,7 @@ fn push_current_branch_to_origin(repository: &Repository) -> Result<(), String> 
         .filter(|name| !name.is_empty() && name != "HEAD")
         .ok_or_else(|| "current branch could not be determined".to_string())?;
 
-    let output = Command::new("git")
+    let output = git_command()
         .current_dir(repository_root(repository)?)
         .arg("push")
         .arg("-u")
@@ -538,7 +608,7 @@ fn checkout_repository_branch(
     }
 
     let repo_root = repository_root(repository)?;
-    let mut command = Command::new("git");
+    let mut command = git_command();
     command.current_dir(repo_root);
 
     match remote_name {
@@ -615,7 +685,7 @@ fn create_branch_from_source(
     };
 
     let repo_root = repository_root(repository)?;
-    let mut command = Command::new("git");
+    let mut command = git_command();
     command.current_dir(repo_root);
 
     if switch_after_create {
@@ -680,7 +750,7 @@ fn delete_repository_branch(
     }
 
     let repo_root = repository_root(repository)?;
-    let mut command = Command::new("git");
+    let mut command = git_command();
     command.current_dir(repo_root);
 
     match branch_kind {
@@ -765,7 +835,7 @@ fn create_stash(
         Some(text) => text,
     };
 
-    let mut command = Command::new("git");
+    let mut command = git_command();
     command
         .current_dir(repo_root)
         .arg("stash")
@@ -852,7 +922,7 @@ fn discard_selected_changes(repository: &Repository, selected_paths: &[String]) 
     let repo_root = repository_root(repository)?;
 
     if !restore_paths.is_empty() {
-        let mut command = Command::new("git");
+        let mut command = git_command();
         command
             .current_dir(&repo_root)
             .arg("restore")
@@ -881,7 +951,7 @@ fn discard_selected_changes(repository: &Repository, selected_paths: &[String]) 
         }
 
         if !tracked_removals.is_empty() {
-            let mut command = Command::new("git");
+            let mut command = git_command();
             command.current_dir(&repo_root).arg("rm").arg("-f").arg("--");
 
             for path in &tracked_removals {
@@ -892,7 +962,7 @@ fn discard_selected_changes(repository: &Repository, selected_paths: &[String]) 
         }
 
         if !untracked_removals.is_empty() {
-            let mut command = Command::new("git");
+            let mut command = git_command();
             command.current_dir(&repo_root).arg("clean").arg("-fd").arg("--");
 
             for path in &untracked_removals {
@@ -968,6 +1038,13 @@ fn repository_root(repository: &Repository) -> Result<PathBuf, String> {
         .map(|path| path.to_path_buf())
 }
 
+fn git_command() -> Command {
+    let mut command = Command::new("git");
+    #[cfg(windows)]
+    command.creation_flags(CREATE_NO_WINDOW);
+    command
+}
+
 fn run_git_command(mut command: Command, action_name: &str) -> Result<(), String> {
     let output = command
         .output()
@@ -1021,7 +1098,7 @@ fn load_worktree_file_diff(
     let patch = if repository.find_path_in_head(file_path)? {
         run_git_diff_command(
             {
-                let mut command = Command::new("git");
+                let mut command = git_command();
                 command
                     .current_dir(&repo_root)
                     .arg("diff")
@@ -1037,7 +1114,7 @@ fn load_worktree_file_diff(
     } else {
         run_git_diff_command(
             {
-                let mut command = Command::new("git");
+                let mut command = git_command();
                 command
                     .current_dir(&repo_root)
                     .arg("diff")
