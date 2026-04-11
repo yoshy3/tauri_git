@@ -17,7 +17,8 @@
   export let onApplySelectedStash = () => {};
   export let onPopSelectedStash = () => {};
 
-  let sidebarFilter = "";
+  let branchFilter = "";
+  let branchFilterTerm = "";
   let sidebarSections = {
     branches: true,
     remotes: true,
@@ -45,12 +46,12 @@
     return remoteSections[name] ?? true;
   }
 
-  function matchesSidebarFilter(value) {
-    if (!sidebarFilterTerm) {
+  function matchesBranchFilter(value) {
+    if (!branchFilterTerm) {
       return true;
     }
 
-    return String(value || "").toLowerCase().includes(sidebarFilterTerm);
+    return String(value || "").toLowerCase().includes(branchFilterTerm);
   }
 
   function buildBranchTree(branchNames) {
@@ -91,23 +92,47 @@
     return root;
   }
 
-  $: sidebarFilterTerm = sidebarFilter.trim().toLowerCase();
-  $: filteredLocalBranches = repository
-    ? repository.local_branches.filter((branchName) => matchesSidebarFilter(branchName))
-    : [];
-  $: localBranchTree = buildBranchTree(filteredLocalBranches);
+  function filterBranchTree(nodes, filterTerm, parentPath = "") {
+    if (!filterTerm) {
+      return nodes;
+    }
+
+    return nodes
+      .map((node) => {
+        const nodePath = parentPath ? `${parentPath}/${node.label}` : node.label;
+
+        if (node.isBranch) {
+          return matchesBranchFilter(node.fullName) ? node : null;
+        }
+
+        const filteredChildren = filterBranchTree(node.children, filterTerm, nodePath);
+        if (matchesBranchFilter(nodePath) || filteredChildren.length > 0) {
+          return {
+            ...node,
+            children: filteredChildren,
+          };
+        }
+
+        return null;
+      })
+      .filter(Boolean);
+  }
+
+  $: branchFilterTerm = branchFilter.trim().toLowerCase();
+  $: localBranchTree = repository ? buildBranchTree(repository.local_branches) : [];
+  $: filteredLocalBranchTree = filterBranchTree(localBranchTree, branchFilterTerm);
   $: filteredRemoteGroups = repository
     ? repository.remote_groups
         .map((group) => {
-          const branches = group.branches.filter((branchName) =>
-            matchesSidebarFilter(`${group.name}/${branchName}`),
-          );
+          const fullTree = buildBranchTree(group.branches);
+          const tree = matchesBranchFilter(group.name)
+            ? fullTree
+            : filterBranchTree(fullTree, branchFilterTerm);
 
-          if (matchesSidebarFilter(group.name) || branches.length > 0) {
+          if (matchesBranchFilter(group.name) || tree.length > 0) {
             return {
               ...group,
-              branches,
-              tree: buildBranchTree(branches),
+              tree,
             };
           }
 
@@ -115,23 +140,16 @@
         })
         .filter(Boolean)
     : [];
-  $: filteredTags = repository
-    ? repository.tags.filter((tagName) => matchesSidebarFilter(tagName))
-    : [];
-  $: filteredStashes = repository
-    ? repository.stashes.filter((stash) =>
-        matchesSidebarFilter(`${stash.name} ${stash.message}`),
-      )
-    : [];
-  $: filteredSubmodules = repository
-    ? repository.submodules.filter((submodule) =>
-        matchesSidebarFilter(`${submodule.name} ${submodule.path}`),
-      )
-    : [];
+  $: hasBranchFilter = branchFilterTerm.length > 0;
+  $: filteredTags = repository ? repository.tags : [];
+  $: filteredStashes = repository ? repository.stashes : [];
+  $: filteredSubmodules = repository ? repository.submodules : [];
   $: selectedStash =
     repository && selectedStashIndex !== null
       ? repository.stashes.find((stash) => stash.index === selectedStashIndex) ?? null
       : null;
+  $: branchesSectionVisible = sidebarSections.branches || hasBranchFilter;
+  $: remotesSectionVisible = sidebarSections.remotes || hasBranchFilter;
 </script>
 
 <aside class="sidebar">
@@ -157,14 +175,14 @@
     {/if}
   </section>
 
-  <div class="sidebar-filter-wrap">
-    <input
-      class="sidebar-filter"
-      placeholder={$_("sidebar.filter")}
-      bind:value={sidebarFilter}
-      disabled={!repository}
-    />
-  </div>
+      <div class="sidebar-filter-wrap">
+        <input
+          class="sidebar-filter"
+          placeholder={$_("sidebar.branchFilter")}
+          bind:value={branchFilter}
+          disabled={!repository}
+        />
+      </div>
 
   <section class="sidebar-tree">
     {#if !repository}
@@ -176,20 +194,24 @@
           <span>{$_("sidebar.branches")}</span>
         </button>
 
-        {#if sidebarSections.branches}
-          {#if filteredLocalBranches.length > 0}
+        {#if branchesSectionVisible}
+          {#if filteredLocalBranchTree.length > 0}
             <div class="tree-branch-root">
-              <BranchTreeNode
-                nodes={localBranchTree}
-                {loading}
-                currentBranch={repository.branch}
-                {menuOpenKey}
-                {onToggleMenu}
-                {onCheckoutReference}
-                {onCreateBranchFromReference}
-                {onDeleteReference}
-              />
+              {#key `local:${branchFilterTerm}`}
+                <BranchTreeNode
+                  nodes={filteredLocalBranchTree}
+                  {loading}
+                  currentBranch={repository.branch}
+                  {menuOpenKey}
+                  {onToggleMenu}
+                  {onCheckoutReference}
+                  {onCreateBranchFromReference}
+                  {onDeleteReference}
+                />
+              {/key}
             </div>
+          {:else if hasBranchFilter}
+            <p class="tree-empty">{$_("sidebar.matchingBranchesEmpty")}</p>
           {:else}
             <p class="tree-empty">{$_("sidebar.branchesEmpty")}</p>
           {/if}
@@ -202,7 +224,7 @@
           <span>{$_("sidebar.remotes")}</span>
         </button>
 
-        {#if sidebarSections.remotes}
+        {#if remotesSectionVisible}
           {#if filteredRemoteGroups.length > 0}
             <ul class="tree-list tree-section-children">
               {#each filteredRemoteGroups as group}
@@ -219,19 +241,21 @@
                       <span class="tree-item-label">{group.name}</span>
                     </summary>
 
-                    {#if group.branches.length > 0}
+                    {#if group.tree.length > 0}
                       <div class="tree-nested-list">
-                        <BranchTreeNode
-                          nodes={group.tree}
-                          {loading}
-                          currentBranch={repository.branch}
-                          remoteName={group.name}
-                          {menuOpenKey}
-                          {onToggleMenu}
-                          {onCheckoutReference}
-                          {onCreateBranchFromReference}
-                          {onDeleteReference}
-                        />
+                        {#key `remote:${group.name}:${branchFilterTerm}`}
+                          <BranchTreeNode
+                            nodes={group.tree}
+                            {loading}
+                            currentBranch={repository.branch}
+                            remoteName={group.name}
+                            {menuOpenKey}
+                            {onToggleMenu}
+                            {onCheckoutReference}
+                            {onCreateBranchFromReference}
+                            {onDeleteReference}
+                          />
+                        {/key}
                       </div>
                     {:else}
                       <p class="tree-empty tree-empty-nested">{$_("sidebar.matchingBranchesEmpty")}</p>
@@ -240,12 +264,15 @@
                 </li>
               {/each}
             </ul>
+          {:else if hasBranchFilter}
+            <p class="tree-empty">{$_("sidebar.matchingBranchesEmpty")}</p>
           {:else}
             <p class="tree-empty">{$_("sidebar.remotesEmpty")}</p>
           {/if}
         {/if}
       </div>
 
+      {#if !hasBranchFilter}
       <div class="tree-section">
         <button class="tree-section-toggle" type="button" on:click={() => toggleSidebarSection("tags")}>
           <span class:expanded={sidebarSections.tags} class="tree-chevron"></span>
@@ -355,6 +382,7 @@
           {/if}
         {/if}
       </div>
+      {/if}
     {/if}
   </section>
 </aside>

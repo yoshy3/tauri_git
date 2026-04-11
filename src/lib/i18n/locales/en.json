@@ -69,6 +69,7 @@
     "noRepository": "No repository",
     "openRepositoryHint": "Open a Git repository from the folder picker.",
     "filter": "Filter",
+    "branchFilter": "Search branches...",
     "branches": "Branches",
     "remotes": "Remotes",
     "tags": "Tags",

@@ -69,6 +69,7 @@
     "noRepository": "No repository",
     "openRepositoryHint": "フォルダ選択ダイアログから Git リポジトリを開いてください。",
     "filter": "Filter",
+    "branchFilter": "ブランチを検索...",
     "branches": "Branches",
     "remotes": "Remotes",
     "tags": "Tags",
