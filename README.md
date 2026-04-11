@@ -29,8 +29,11 @@ Tauri Git is a desktop Git client focused on a compact workflow:
 - Repository picker and last-opened repository restore
 - Working tree status list
 - Commit history with labels for local and remote refs
+- Commit detail panel with author / committer / refs / parents / changed files
+- Side-by-side diff dialog from commit details
 - Commit creation from the changes panel
 - Stash create / apply / pop
+- Stash selection and apply / pop from the sidebar
 - `Fetch`, `Pull`, `Push`, and `Refresh`
 - Local and remote branch tree display with `/`-based nesting
 - Branch checkout from local and remote refs
@@ -108,6 +111,7 @@ src-tauri/  Tauri + Rust backend
 
 - Some Git operations are implemented through the system `git` command for compatibility with familiar workflows.
 - The application currently targets a minimal desktop workflow rather than full parity with large Git GUI clients.
+- The side-by-side compare view is currently available from commit details and is planned to be reused in the changes panel as well.
 
 ## License
 
