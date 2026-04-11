@@ -27,6 +27,10 @@
   let historyLoading = false;
   let historyLoadedAll = false;
   let historyRequestId = 0;
+  let selectedCommitOid = "";
+  let selectedCommitDetail = null;
+  let selectedCommitDetailLoading = false;
+  let commitDetailRequestId = 0;
   let branchDialogOpen = false;
   let branchNameDraft = "";
   let branchSwitchAfterCreate = true;
@@ -85,6 +89,9 @@
     error = "";
     repository = null;
     selectedRef = null;
+    selectedCommitOid = "";
+    selectedCommitDetail = null;
+    selectedCommitDetailLoading = false;
     closeBranchMenu();
     resetHistoryState();
     if (resetPane) {
@@ -142,6 +149,9 @@
         path: repository.repo_path,
       });
       selectedRef = null;
+      selectedCommitOid = "";
+      selectedCommitDetail = null;
+      selectedCommitDetailLoading = false;
       closeBranchMenu();
       rightPaneExpanded = false;
       rightPaneTab = "commit";
@@ -551,6 +561,9 @@
     historyCommits = [];
     historyLoading = true;
     historyLoadedAll = false;
+    selectedCommitOid = "";
+    selectedCommitDetail = null;
+    selectedCommitDetailLoading = false;
 
     let offset = 0;
 
@@ -619,6 +632,56 @@
       selectedRef = null;
     }
   }
+  $: if (selectedCommitOid && !historyCommits.some((commit) => commit.oid === selectedCommitOid)) {
+    selectedCommitOid = "";
+    selectedCommitDetail = null;
+    selectedCommitDetailLoading = false;
+  }
+
+  async function loadCommitDetail(path, oid) {
+    const requestId = commitDetailRequestId + 1;
+    commitDetailRequestId = requestId;
+    selectedCommitDetailLoading = true;
+
+    try {
+      const detail = await invoke("get_commit_detail", {
+        path,
+        oid,
+      });
+
+      if (requestId !== commitDetailRequestId || selectedCommitOid !== oid) {
+        return;
+      }
+
+      selectedCommitDetail = detail;
+    } catch (message) {
+      if (requestId !== commitDetailRequestId) {
+        return;
+      }
+
+      error = String(message);
+    } finally {
+      if (requestId === commitDetailRequestId) {
+        selectedCommitDetailLoading = false;
+      }
+    }
+  }
+
+  function selectCommit(oid) {
+    if (!repository || !oid || selectedCommitOid === oid) {
+      return;
+    }
+
+    selectedCommitOid = oid;
+    selectedCommitDetail = null;
+    void loadCommitDetail(repository.repo_path, oid);
+  }
+
+  function closeCommitDetail() {
+    selectedCommitOid = "";
+    selectedCommitDetail = null;
+    selectedCommitDetailLoading = false;
+  }
 </script>
 
 <svelte:head>
@@ -661,6 +724,11 @@
       {historyCommits}
       {historyLoading}
       {historyLoadedAll}
+      {selectedCommitOid}
+      {selectedCommitDetail}
+      {selectedCommitDetailLoading}
+      onSelectCommit={selectCommit}
+      onCloseCommitDetail={closeCommitDetail}
     />
 
     <CommitPane

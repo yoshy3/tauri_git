@@ -107,7 +107,24 @@
     "loadingTitle": "Loading commit history.",
     "loadingBody": "The list updates as chunks arrive.",
     "emptyTitle": "No commit history available.",
-    "emptyBody": "Open a repository or create the first commit."
+    "emptyBody": "Open a repository or create the first commit.",
+    "details": {
+      "loadingTitle": "Loading commit details.",
+      "loadingBody": "Commit metadata and patch are being loaded.",
+      "emptyTitle": "Select a commit to inspect details.",
+      "emptyBody": "The lower panel shows metadata and file changes for the selected commit.",
+      "author": "Author",
+      "committer": "Committer",
+      "close": "Close details",
+      "refs": "Refs",
+      "sha": "SHA",
+      "parents": "Parents",
+      "files": "Files ({count})",
+      "filesEmpty": "No changed files in this commit.",
+      "diff": "Patch",
+      "diffEmpty": "No patch available for this commit.",
+      "none": "None"
+    }
   },
   "commit": {
     "openPanel": "Open Changes Panel",

@@ -1,4 +1,7 @@
-use git2::{Cred, FetchOptions, RemoteCallbacks, Repository, Signature, Status, StatusOptions};
+use git2::{
+    Cred, DiffFormat, DiffOptions, FetchOptions, Oid, RemoteCallbacks, Repository, Signature,
+    Status, StatusOptions,
+};
 use serde::Serialize;
 use std::collections::{BTreeMap, HashMap};
 use std::path::PathBuf;
@@ -70,6 +73,39 @@ struct GitRefLabel {
 struct GitCommitHistoryChunk {
     commits: Vec<GitCommitSummary>,
     has_more: bool,
+}
+
+#[derive(Serialize)]
+struct GitCommitDetail {
+    oid: String,
+    id: String,
+    summary: String,
+    message: String,
+    author: GitCommitPerson,
+    committer: GitCommitPerson,
+    parents: Vec<GitCommitParent>,
+    labels: Vec<GitRefLabel>,
+    files: Vec<GitCommitFileDiff>,
+}
+
+#[derive(Serialize)]
+struct GitCommitPerson {
+    name: String,
+    email: String,
+    committed_at: String,
+}
+
+#[derive(Serialize)]
+struct GitCommitParent {
+    oid: String,
+    id: String,
+}
+
+#[derive(Serialize)]
+struct GitCommitFileDiff {
+    path: String,
+    status: String,
+    patch: String,
 }
 
 #[tauri::command]
@@ -210,6 +246,12 @@ fn get_commit_history_chunk(
 ) -> Result<GitCommitHistoryChunk, String> {
     let repository = open_repo(&path)?;
     load_commit_history_chunk(&repository, offset, limit)
+}
+
+#[tauri::command]
+fn get_commit_detail(path: String, oid: String) -> Result<GitCommitDetail, String> {
+    let repository = open_repo(&path)?;
+    load_commit_detail(&repository, &oid)
 }
 
 fn open_repo(path: &str) -> Result<Repository, String> {
@@ -1066,6 +1108,140 @@ fn load_commit_history_chunk(
     Ok(GitCommitHistoryChunk { commits, has_more })
 }
 
+fn load_commit_detail(repository: &Repository, oid: &str) -> Result<GitCommitDetail, String> {
+    let current_branch_name = repository
+        .head()
+        .ok()
+        .and_then(|head| head.shorthand().map(ToOwned::to_owned));
+    let reference_labels = load_reference_labels(repository, current_branch_name.as_deref())?;
+    let oid = Oid::from_str(oid).map_err(|error| format!("コミット ID が不正です: {}", error.message()))?;
+    let commit = repository
+        .find_commit(oid)
+        .map_err(|error| format!("コミットを読み込めませんでした: {}", error.message()))?;
+
+    let files = load_commit_file_diffs(repository, &commit)?;
+
+    Ok(GitCommitDetail {
+        oid: oid.to_string(),
+        id: oid.to_string().chars().take(7).collect(),
+        summary: commit.summary().unwrap_or("(no summary)").to_string(),
+        message: commit.message().unwrap_or("").trim_end().to_string(),
+        author: build_commit_person(commit.author()),
+        committer: build_commit_person(commit.committer()),
+        parents: commit
+            .parent_ids()
+            .map(|parent_oid| GitCommitParent {
+                oid: parent_oid.to_string(),
+                id: parent_oid.to_string().chars().take(7).collect(),
+            })
+            .collect(),
+        labels: reference_labels
+            .get(&oid.to_string())
+            .cloned()
+            .unwrap_or_default(),
+        files,
+    })
+}
+
+fn build_commit_person(signature: git2::Signature<'_>) -> GitCommitPerson {
+    GitCommitPerson {
+        name: signature.name().unwrap_or("Unknown").to_string(),
+        email: signature.email().unwrap_or("").to_string(),
+        committed_at: format_signature_time(signature.when()),
+    }
+}
+
+fn format_signature_time(time: git2::Time) -> String {
+    let timestamp = time.seconds();
+    let offset_seconds = time.offset_minutes() * 60;
+    let Some(offset) = chrono::FixedOffset::east_opt(offset_seconds) else {
+        return "unknown time".to_string();
+    };
+    let Some(datetime) = chrono::DateTime::from_timestamp(timestamp, 0) else {
+        return "unknown time".to_string();
+    };
+
+    datetime
+        .with_timezone(&offset)
+        .format("%Y-%m-%d %H:%M:%S %:z")
+        .to_string()
+}
+
+fn load_commit_file_diffs(
+    repository: &Repository,
+    commit: &git2::Commit<'_>,
+) -> Result<Vec<GitCommitFileDiff>, String> {
+    let commit_tree = commit
+        .tree()
+        .map_err(|error| format!("コミットツリーを取得できませんでした: {}", error.message()))?;
+    let parent_tree = if commit.parent_count() > 0 {
+        Some(
+            commit
+                .parent(0)
+                .and_then(|parent| parent.tree())
+                .map_err(|error| format!("親コミットのツリーを取得できませんでした: {}", error.message()))?,
+        )
+    } else {
+        None
+    };
+
+    let mut diff_options = DiffOptions::new();
+    diff_options
+        .context_lines(3)
+        .interhunk_lines(1)
+        .include_untracked(true)
+        .recurse_untracked_dirs(true);
+
+    let diff = repository
+        .diff_tree_to_tree(
+            parent_tree.as_ref(),
+            Some(&commit_tree),
+            Some(&mut diff_options),
+        )
+        .map_err(|error| format!("コミット差分を読み込めませんでした: {}", error.message()))?;
+
+    let mut files = diff
+        .deltas()
+        .map(|delta| GitCommitFileDiff {
+            path: diff_delta_path(&delta),
+            status: diff_delta_status(&delta).to_string(),
+            patch: String::new(),
+        })
+        .collect::<Vec<_>>();
+
+    diff.print(DiffFormat::Patch, |delta, _hunk, line| {
+        let path = diff_delta_path(&delta);
+        if let Some(file) = files.iter_mut().find(|file| file.path == path) {
+            file.patch.push_str(&String::from_utf8_lossy(line.content()));
+        }
+        true
+    })
+    .map_err(|error| format!("コミットパッチを読み込めませんでした: {}", error.message()))?;
+
+    Ok(files)
+}
+
+fn diff_delta_path(delta: &git2::DiffDelta<'_>) -> String {
+    delta
+        .new_file()
+        .path()
+        .or_else(|| delta.old_file().path())
+        .map(|path| path.display().to_string())
+        .unwrap_or_else(|| "(unknown file)".to_string())
+}
+
+fn diff_delta_status(delta: &git2::DiffDelta<'_>) -> char {
+    match delta.status() {
+        git2::Delta::Added => 'A',
+        git2::Delta::Deleted => 'D',
+        git2::Delta::Modified => 'M',
+        git2::Delta::Renamed => 'R',
+        git2::Delta::Copied => 'C',
+        git2::Delta::Typechange => 'T',
+        _ => 'M',
+    }
+}
+
 fn load_reference_labels(
     repository: &Repository,
     current_branch_name: Option<&str>,
@@ -1346,7 +1522,8 @@ pub fn run() {
             discard_changes,
             apply_stash,
             pop_stash,
-            get_commit_history_chunk
+            get_commit_history_chunk,
+            get_commit_detail
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

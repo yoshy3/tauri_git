@@ -1,4 +1,5 @@
 <script>
+  import { tick } from "svelte";
   import { _ } from "svelte-i18n";
 
   export let repository = null;
@@ -6,6 +7,11 @@
   export let historyCommits = [];
   export let historyLoading = false;
   export let historyLoadedAll = false;
+  export let selectedCommitOid = "";
+  export let selectedCommitDetail = null;
+  export let selectedCommitDetailLoading = false;
+  export let onSelectCommit = () => {};
+  export let onCloseCommitDetail = () => {};
 
   const graphLaneSpacing = 14;
   const graphPadding = 10;
@@ -38,6 +44,70 @@
       minute: "2-digit",
       hour12: false,
     }).format(date);
+  }
+
+  function formatDetailPatchLineClass(line) {
+    if (line.startsWith("@@")) {
+      return "patch-line patch-line-hunk";
+    }
+    if (line.startsWith("+")) {
+      return "patch-line patch-line-added";
+    }
+    if (line.startsWith("-")) {
+      return "patch-line patch-line-removed";
+    }
+    return "patch-line";
+  }
+
+  function clampDetailPanelHeight(height) {
+    const maxHeight = Math.max(detailPanelMinHeight, windowHeight - 220);
+    return Math.min(Math.max(height, detailPanelMinHeight), maxHeight);
+  }
+
+  function ensureSelectedCommitVisible() {
+    if (!selectedCommitOid || !historyRowsElement) {
+      return;
+    }
+
+    const rowButton = historyRowsElement.querySelector(`[data-commit-oid="${selectedCommitOid}"]`);
+    if (!rowButton) {
+      return;
+    }
+
+    const containerRect = historyRowsElement.getBoundingClientRect();
+    const rowRect = rowButton.getBoundingClientRect();
+
+    if (rowRect.top < containerRect.top) {
+      historyRowsElement.scrollTop -= containerRect.top - rowRect.top + 8;
+      return;
+    }
+
+    if (rowRect.bottom > containerRect.bottom) {
+      historyRowsElement.scrollTop += rowRect.bottom - containerRect.bottom + 8;
+    }
+  }
+
+  function handleSplitterPointerDown(event) {
+    if (!detailPanelVisible) {
+      return;
+    }
+
+    detailPanelDragging = true;
+    detailPanelHeightManuallySet = true;
+    detailDragStartY = event.clientY;
+    detailDragStartHeight = activeDetailPanelHeight;
+  }
+
+  function handleWindowPointerMove(event) {
+    if (!detailPanelDragging) {
+      return;
+    }
+
+    detailPanelHeight = clampDetailPanelHeight(detailDragStartHeight - (event.clientY - detailDragStartY));
+  }
+
+  function handleWindowPointerUp() {
+    detailPanelDragging = false;
   }
 
   function dedupeLaneEntries(entries) {
@@ -201,7 +271,41 @@
     historyGraphRows.length > 0 ? historyGraphRows[0].graphWidth : 0,
     56,
   );
+  const detailPanelMinHeight = 340;
+  let windowHeight = 900;
+  let historyRowsElement;
+  let detailPanelHeight = 0;
+  let detailPanelHeightManuallySet = false;
+  let detailPanelDragging = false;
+  let detailDragStartY = 0;
+  let detailDragStartHeight = 0;
+  let previousDetailScrollKey = "";
+  $: detailPanelVisible = !!selectedCommitOid;
+  $: defaultDetailPanelHeight = clampDetailPanelHeight(Math.round(windowHeight * 0.44));
+  $: activeDetailPanelHeight =
+    detailPanelVisible && detailPanelHeightManuallySet
+      ? clampDetailPanelHeight(detailPanelHeight)
+      : defaultDetailPanelHeight;
+  let selectedDetailPath = "";
+  $: detailFiles = selectedCommitDetail?.files ?? [];
+  $: if (detailFiles.length === 0) {
+    selectedDetailPath = "";
+  } else if (!selectedDetailPath || !detailFiles.some((file) => file.path === selectedDetailPath)) {
+    selectedDetailPath = detailFiles[0].path;
+  }
+  $: selectedDetailFile =
+    detailFiles.find((file) => file.path === selectedDetailPath) ?? detailFiles[0] ?? null;
+  $: selectedDetailPatchLines = selectedDetailFile ? selectedDetailFile.patch.split("\n") : [];
+  $: detailScrollKey = `${selectedCommitOid}:${detailPanelVisible ? "open" : "closed"}`;
+  $: if (detailScrollKey !== previousDetailScrollKey) {
+    previousDetailScrollKey = detailScrollKey;
+    if (detailPanelVisible) {
+      void tick().then(ensureSelectedCommitVisible);
+    }
+  }
 </script>
+
+<svelte:window bind:innerHeight={windowHeight} on:pointermove={handleWindowPointerMove} on:pointerup={handleWindowPointerUp} />
 
 <section class="center-pane">
   <div class="history-toolbar">
@@ -233,66 +337,68 @@
     </div>
 
     {#if repository && historyCommits.length > 0}
-      <ul class="history-rows">
+      <ul bind:this={historyRowsElement} class="history-rows">
         {#each historyGraphRows as commit}
-          <li class:muted-history-row={!commit.on_current_branch}>
-            <div class="graph-cell">
-              <svg
-                class="graph-svg"
-                viewBox={`0 0 ${commit.graphWidth} ${graphRowHeight}`}
-                width={commit.graphWidth}
-                height={graphRowHeight}
-                preserveAspectRatio="xMinYMid meet"
-                aria-hidden="true"
-              >
-                {#each commit.graphLines as line}
-                  <path
-                    d={line.d}
-                    stroke={line.stroke}
-                    stroke-width="2"
-                    fill="none"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                  />
-                {/each}
-                <circle
-                  cx={commit.graphNodeX}
-                  cy={graphCenterY}
-                  r={commit.graphIsHead ? 4.5 : 3.5}
-                  fill={commit.graphNodeColor}
-                />
-              </svg>
-            </div>
-
-            <div class="subject-cell">
-              {#if commit.labels.length > 0}
-                <div class="history-tags">
-                  {#each commit.labels as label}
-                    <span
-                      class:history-tag-local={label.scope === "local"}
-                      class:history-tag-remote={label.scope === "remote"}
-                      class:history-tag-current={label.is_current}
-                    >
-                      {label.name}
-                    </span>
+          <li class:history-row-selected={selectedCommitOid === commit.oid} class:muted-history-row={!commit.on_current_branch}>
+            <button class="history-row-button" data-commit-oid={commit.oid} type="button" on:click={() => onSelectCommit(commit.oid)}>
+              <div class="graph-cell">
+                <svg
+                  class="graph-svg"
+                  viewBox={`0 0 ${commit.graphWidth} ${graphRowHeight}`}
+                  width={commit.graphWidth}
+                  height={graphRowHeight}
+                  preserveAspectRatio="xMinYMid meet"
+                  aria-hidden="true"
+                >
+                  {#each commit.graphLines as line}
+                    <path
+                      d={line.d}
+                      stroke={line.stroke}
+                      stroke-width="2"
+                      fill="none"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    />
                   {/each}
-                </div>
-              {/if}
-              <strong>{commit.summary}</strong>
-            </div>
+                  <circle
+                    cx={commit.graphNodeX}
+                    cy={graphCenterY}
+                    r={commit.graphIsHead ? 4.5 : 3.5}
+                    fill={commit.graphNodeColor}
+                  />
+                </svg>
+              </div>
 
-            <div class="author-cell">
-              <span class="avatar">{initials(commit.author)}</span>
-              <span>{commit.author}</span>
-            </div>
+              <div class="subject-cell">
+                {#if commit.labels.length > 0}
+                  <div class="history-tags">
+                    {#each commit.labels as label}
+                      <span
+                        class:history-tag-local={label.scope === "local"}
+                        class:history-tag-remote={label.scope === "remote"}
+                        class:history-tag-current={label.is_current}
+                      >
+                        {label.name}
+                      </span>
+                    {/each}
+                  </div>
+                {/if}
+                <strong>{commit.summary}</strong>
+              </div>
 
-            <div class="hash-cell">
-              <span>{commit.id}</span>
-            </div>
+              <div class="author-cell">
+                <span class="avatar">{initials(commit.author)}</span>
+                <span>{commit.author}</span>
+              </div>
 
-            <div class="date-cell">
-              <span>{formatLocalDateTime(commit.committed_at)}</span>
-            </div>
+              <div class="hash-cell">
+                <span>{commit.id}</span>
+              </div>
+
+              <div class="date-cell">
+                <span>{formatLocalDateTime(commit.committed_at)}</span>
+              </div>
+            </button>
           </li>
         {/each}
       </ul>
@@ -308,6 +414,151 @@
       </div>
     {/if}
   </section>
+
+  {#if detailPanelVisible}
+    <div
+      class:commit-details-splitter-active={detailPanelDragging}
+      class="commit-details-splitter"
+      role="separator"
+      aria-orientation="horizontal"
+      on:pointerdown={handleSplitterPointerDown}
+    ></div>
+
+    <section class="commit-details" style={`height: ${activeDetailPanelHeight}px;`}>
+      {#if selectedCommitDetailLoading}
+        <div class="commit-details-empty">
+          <p>{$_("history.details.loadingTitle")}</p>
+          <p class="muted">{$_("history.details.loadingBody")}</p>
+        </div>
+      {:else if selectedCommitDetail}
+        <div class="commit-details-header">
+          <div class="commit-details-header-top">
+            <div class="commit-details-party-grid">
+              <div class="commit-party-card">
+                <div class="commit-party-label">{$_("history.details.author")}</div>
+                <div class="commit-party-main">
+                  <span class="commit-party-avatar">{initials(selectedCommitDetail.author.name)}</span>
+                  <div class="commit-party-copy">
+                    <strong>{selectedCommitDetail.author.name}</strong>
+                    <span>{selectedCommitDetail.author.email}</span>
+                    <span>{selectedCommitDetail.author.committed_at}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="commit-party-card">
+                <div class="commit-party-label">{$_("history.details.committer")}</div>
+                <div class="commit-party-main">
+                  <span class="commit-party-avatar">{initials(selectedCommitDetail.committer.name)}</span>
+                  <div class="commit-party-copy">
+                    <strong>{selectedCommitDetail.committer.name}</strong>
+                    <span>{selectedCommitDetail.committer.email}</span>
+                    <span>{selectedCommitDetail.committer.committed_at}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <button class="commit-details-close" type="button" aria-label={$_("history.details.close")} on:click={onCloseCommitDetail}>
+              ×
+            </button>
+          </div>
+
+          <div class="commit-detail-meta">
+            <div class="commit-detail-meta-row">
+              <span>{$_("history.details.refs")}</span>
+              <div class="history-tags">
+                {#if selectedCommitDetail.labels.length > 0}
+                  {#each selectedCommitDetail.labels as label}
+                    <span
+                      class:history-tag-local={label.scope === "local"}
+                      class:history-tag-remote={label.scope === "remote"}
+                      class:history-tag-current={label.is_current}
+                    >
+                      {label.name}
+                    </span>
+                  {/each}
+                {:else}
+                  <span class="commit-detail-meta-empty">{$_("history.details.none")}</span>
+                {/if}
+              </div>
+            </div>
+
+            <div class="commit-detail-meta-row">
+              <span>{$_("history.details.sha")}</span>
+              <code>{selectedCommitDetail.oid}</code>
+            </div>
+
+            <div class="commit-detail-meta-row">
+              <span>{$_("history.details.parents")}</span>
+              <div class="commit-parent-links">
+                {#if selectedCommitDetail.parents.length > 0}
+                  {#each selectedCommitDetail.parents as parent}
+                    <button class="commit-inline-link" type="button" on:click={() => onSelectCommit(parent.oid)}>
+                      {parent.id}
+                    </button>
+                  {/each}
+                {:else}
+                  <span class="commit-detail-meta-empty">{$_("history.details.none")}</span>
+                {/if}
+              </div>
+            </div>
+          </div>
+
+          <div class="commit-message-block">
+            <h3>{selectedCommitDetail.summary}</h3>
+            {#if selectedCommitDetail.message && selectedCommitDetail.message !== selectedCommitDetail.summary}
+              <pre>{selectedCommitDetail.message}</pre>
+            {/if}
+          </div>
+        </div>
+
+        <div class="commit-details-body">
+          <aside class="commit-files-list">
+            <div class="commit-files-header">{$_("history.details.files", { values: { count: detailFiles.length } })}</div>
+            {#if detailFiles.length > 0}
+              <ul>
+                {#each detailFiles as file}
+                  <li>
+                    <button
+                      class:commit-file-selected={selectedDetailFile && selectedDetailFile.path === file.path}
+                      class="commit-file-button"
+                      type="button"
+                      on:click={() => (selectedDetailPath = file.path)}
+                    >
+                      <span class="commit-file-status">{file.status}</span>
+                      <span class="commit-file-path">{file.path}</span>
+                    </button>
+                  </li>
+                {/each}
+              </ul>
+            {:else}
+              <p class="commit-details-empty muted">{$_("history.details.filesEmpty")}</p>
+            {/if}
+          </aside>
+
+          <section class="commit-diff-view">
+            <div class="commit-files-header">
+              {selectedDetailFile ? selectedDetailFile.path : $_("history.details.diff")}
+            </div>
+
+            {#if selectedDetailFile}
+              <pre class="patch-view">{#each selectedDetailPatchLines as line, index}<span class={formatDetailPatchLineClass(line)}>{line}{index < selectedDetailPatchLines.length - 1 ? "\n" : ""}</span>{/each}</pre>
+            {:else}
+              <div class="commit-details-empty">
+                <p>{$_("history.details.diffEmpty")}</p>
+              </div>
+            {/if}
+          </section>
+        </div>
+      {:else}
+        <div class="commit-details-empty">
+          <p>{$_("history.details.loadingTitle")}</p>
+          <p class="muted">{$_("history.details.loadingBody")}</p>
+        </div>
+      {/if}
+    </section>
+  {/if}
 </section>
 
 <style>
@@ -315,8 +566,8 @@
     min-height: 0;
     min-width: 0;
     padding: 12px;
-    display: grid;
-    grid-template-rows: auto auto 1fr;
+    display: flex;
+    flex-direction: column;
     gap: 10px;
     background: linear-gradient(180deg, rgba(11, 22, 34, 0.6), rgba(10, 20, 31, 0.36));
     overflow: hidden;
@@ -378,6 +629,7 @@
   }
 
   .history-table {
+    flex: 1 1 auto;
     overflow: hidden;
     display: grid;
     grid-template-rows: auto 1fr;
@@ -389,7 +641,7 @@
   }
 
   .history-head,
-  .history-rows li {
+  .history-row-button {
     display: grid;
     grid-template-columns: var(--graph-column-width, 108px) minmax(0, 1.5fr) minmax(140px, 0.8fr) 92px 132px;
     gap: 14px;
@@ -414,19 +666,34 @@
   }
 
   .history-rows li {
-    padding: 0 12px;
-    border-bottom: 1px solid rgba(120, 148, 177, 0.04);
-    transition: background 120ms ease;
-    height: 32px;
-    box-sizing: border-box;
+    list-style: none;
   }
 
-  .history-rows li:hover {
+  .history-row-button {
+    width: 100%;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    text-align: left;
+    padding: 0 12px;
+    border-bottom: 1px solid rgba(120, 148, 177, 0.04);
+    transition: background 120ms ease, box-shadow 120ms ease;
+    height: 32px;
+    box-sizing: border-box;
+    cursor: pointer;
+  }
+
+  .history-row-button:hover {
     background: rgba(255, 255, 255, 0.02);
   }
 
-  .history-rows li.muted-history-row {
+  .history-rows li.muted-history-row .history-row-button {
     background: rgba(255, 255, 255, 0.01);
+  }
+
+  .history-rows li.history-row-selected .history-row-button {
+    background: rgba(35, 82, 135, 0.22);
+    box-shadow: inset 0 0 0 1px rgba(77, 160, 255, 0.22);
   }
 
   .graph-cell {
@@ -573,6 +840,315 @@
     margin-top: 4px;
   }
 
+  .commit-details {
+    flex: 0 0 auto;
+    min-height: 340px;
+    display: grid;
+    grid-template-rows: auto 1fr;
+    overflow: hidden;
+    border-radius: 8px;
+    background: var(--panel-background);
+    border: 1px solid var(--panel-border);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.02);
+  }
+
+  .commit-details-splitter {
+    flex: 0 0 10px;
+    margin: -2px 0;
+    cursor: row-resize;
+    position: relative;
+  }
+
+  .commit-details-splitter::before {
+    content: "";
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 64px;
+    height: 4px;
+    border-radius: 999px;
+    transform: translate(-50%, -50%);
+    background: rgba(120, 148, 177, 0.28);
+  }
+
+  .commit-details-splitter:hover::before,
+  .commit-details-splitter.commit-details-splitter-active::before {
+    background: rgba(77, 160, 255, 0.68);
+  }
+
+  .commit-details-header {
+    display: grid;
+    gap: 12px;
+    padding: 14px 16px 12px;
+    border-bottom: 1px solid rgba(120, 148, 177, 0.08);
+  }
+
+  .commit-details-header-top {
+    display: flex;
+    gap: 14px;
+    align-items: start;
+    justify-content: space-between;
+  }
+
+  .commit-details-body {
+    min-height: 0;
+    display: grid;
+    grid-template-columns: 240px minmax(0, 1fr);
+  }
+
+  .commit-details-empty {
+    padding: 18px 16px;
+  }
+
+  .commit-details-empty p {
+    margin: 0;
+  }
+
+  .commit-details-empty p + p {
+    margin-top: 4px;
+  }
+
+  .commit-details-party-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+  }
+
+  .commit-party-card {
+    min-width: 0;
+  }
+
+  .commit-party-label {
+    margin-bottom: 6px;
+    color: #8aa0b8;
+    font-size: 0.72rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .commit-party-main {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .commit-party-avatar {
+    width: 34px;
+    height: 34px;
+    flex-shrink: 0;
+    border-radius: 10px;
+    display: grid;
+    place-items: center;
+    background: linear-gradient(135deg, #7a56c2, #d3b8f8);
+    color: white;
+    font-size: 0.8rem;
+    font-weight: 700;
+  }
+
+  .commit-party-copy {
+    min-width: 0;
+    display: grid;
+    gap: 2px;
+  }
+
+  .commit-party-copy strong,
+  .commit-party-copy span {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .commit-party-copy strong {
+    font-size: 0.94rem;
+    color: #eef5fb;
+  }
+
+  .commit-party-copy span {
+    color: #8aa0b8;
+    font-size: 0.76rem;
+  }
+
+  .commit-detail-meta {
+    display: grid;
+    gap: 6px;
+  }
+
+  .commit-details-close {
+    flex: 0 0 auto;
+    width: 30px;
+    height: 30px;
+    border: 1px solid rgba(120, 148, 177, 0.12);
+    border-radius: 999px;
+    background: rgba(11, 22, 34, 0.82);
+    color: #dce7f2;
+    font-size: 1rem;
+    line-height: 1;
+  }
+
+  .commit-details-close:hover {
+    background: rgba(22, 38, 54, 0.96);
+  }
+
+  .commit-detail-meta-row {
+    display: grid;
+    grid-template-columns: 72px minmax(0, 1fr);
+    gap: 10px;
+    align-items: start;
+  }
+
+  .commit-detail-meta-row > span:first-child {
+    color: #8aa0b8;
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+
+  .commit-detail-meta-row code {
+    color: #d9e7f4;
+    font-size: 0.8rem;
+    word-break: break-all;
+  }
+
+  .commit-parent-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+  }
+
+  .commit-inline-link {
+    border: 0;
+    padding: 0;
+    background: transparent;
+    color: #6bb0ff;
+    font-size: 0.82rem;
+  }
+
+  .commit-inline-link:hover {
+    color: #9dc9ff;
+    text-decoration: underline;
+  }
+
+  .commit-detail-meta-empty {
+    color: #627388;
+    font-size: 0.76rem;
+  }
+
+  .commit-message-block h3 {
+    margin: 0;
+    color: #eef5fb;
+    font-size: 0.94rem;
+    font-weight: 600;
+  }
+
+  .commit-message-block pre {
+    margin: 8px 0 0;
+    color: #dce7f2;
+    font-size: 0.82rem;
+    line-height: 1.45;
+    white-space: pre-wrap;
+    word-break: break-word;
+    font-family: inherit;
+  }
+
+  .commit-files-list {
+    min-height: 0;
+    overflow: auto;
+    border-right: 1px solid rgba(120, 148, 177, 0.08);
+    background: rgba(7, 14, 22, 0.32);
+  }
+
+  .commit-files-header {
+    padding: 10px 12px;
+    border-bottom: 1px solid rgba(120, 148, 177, 0.08);
+    color: #8aa0b8;
+    font-size: 0.72rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .commit-files-list ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+
+  .commit-file-button {
+    width: 100%;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    display: grid;
+    grid-template-columns: 18px minmax(0, 1fr);
+    gap: 8px;
+    align-items: center;
+    text-align: left;
+    padding: 8px 12px;
+  }
+
+  .commit-file-button:hover {
+    background: rgba(255, 255, 255, 0.03);
+  }
+
+  .commit-file-button.commit-file-selected {
+    background: rgba(35, 82, 135, 0.22);
+    box-shadow: inset 0 0 0 1px rgba(77, 160, 255, 0.18);
+  }
+
+  .commit-file-status {
+    color: #ffbf69;
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-align: center;
+  }
+
+  .commit-file-path {
+    color: #e5eef7;
+    font-size: 0.8rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .commit-diff-view {
+    min-height: 0;
+    display: grid;
+    grid-template-rows: auto 1fr;
+    overflow: hidden;
+  }
+
+  .patch-view {
+    margin: 0;
+    min-height: 0;
+    overflow: auto;
+    padding: 12px 14px;
+    background: #0a1118;
+    color: #dce7f2;
+    font-size: 0.76rem;
+    line-height: 1.45;
+    font-family: "SFMono-Regular", "Menlo", monospace;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+
+  .patch-line {
+    display: block;
+  }
+
+  .patch-line-hunk {
+    color: #8fb9e6;
+  }
+
+  .patch-line-added {
+    background: rgba(88, 171, 105, 0.24);
+    color: #b7f0c3;
+  }
+
+  .patch-line-removed {
+    background: rgba(180, 78, 78, 0.2);
+    color: #ffb5b5;
+  }
+
   @media (max-width: 860px) {
     .center-pane {
       padding: 14px;
@@ -584,11 +1160,11 @@
     }
 
     .history-head,
-    .history-rows li {
+    .history-row-button {
       grid-template-columns: 84px minmax(0, 1fr);
     }
 
-    .history-rows li {
+    .history-row-button {
       height: 30px;
       padding: 0 10px;
     }
@@ -600,6 +1176,21 @@
     .hash-cell,
     .date-cell {
       display: none;
+    }
+
+    .commit-details {
+      min-height: 360px;
+    }
+
+    .commit-details-party-grid,
+    .commit-details-body {
+      grid-template-columns: 1fr;
+    }
+
+    .commit-files-list {
+      border-right: 0;
+      border-bottom: 1px solid rgba(120, 148, 177, 0.08);
+      max-height: 140px;
     }
   }
 </style>
