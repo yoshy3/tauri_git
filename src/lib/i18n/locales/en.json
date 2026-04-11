@@ -77,6 +77,7 @@
     "submodules": "Submodules",
     "selectedRef": "Selected Ref",
     "selectedTag": "Selected Tag",
+    "branchActions": "Branch actions",
     "checkout": "Checkout",
     "newBranch": "New Branch",
     "cancel": "Cancel",

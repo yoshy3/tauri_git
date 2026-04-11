@@ -1,4 +1,6 @@
 <script>
+  import { _ } from "svelte-i18n";
+
   export let nodes = [];
   export let loading = false;
   export let currentBranch = "";
@@ -72,7 +74,7 @@
             <button
               class="tree-item-kebab"
               type="button"
-              aria-label="Branch actions"
+              aria-label={$_("sidebar.branchActions")}
               disabled={loading}
               on:click={() => openMenu(node)}
             >
@@ -84,13 +86,13 @@
             {#if menuOpenKey === node.key}
               <div class="tree-item-menu">
                 <button class="tree-item-menu-button" type="button" on:click={() => checkout(node)} disabled={loading}>
-                  Checkout
+                  {$_("sidebar.checkout")}
                 </button>
                 <button class="tree-item-menu-button" type="button" on:click={() => createBranch(node)} disabled={loading}>
-                  New Branch
+                  {$_("sidebar.newBranch")}
                 </button>
                 <button class="tree-item-menu-button tree-item-menu-button-danger" type="button" on:click={() => deleteBranch(node)} disabled={loading || (!remoteName && isCurrentBranch(node))}>
-                  Delete Branch
+                  {$_("branchDelete.delete")}
                 </button>
               </div>
             {/if}

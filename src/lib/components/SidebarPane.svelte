@@ -728,7 +728,7 @@
 
   .stash-actions-buttons {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 6px;
     min-width: 0;
   }
@@ -743,8 +743,13 @@
     padding: 7px 10px;
     font-size: 0.69rem;
     font-weight: 700;
-    letter-spacing: 0.04em;
+    letter-spacing: 0.01em;
     white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
   }
 
   .stash-action-button:hover:enabled {
@@ -762,6 +767,7 @@
   }
 
   .stash-action-button-danger {
+    grid-column: 1 / -1;
     background: rgba(132, 59, 39, 0.24);
     color: #ffd6c7;
   }
