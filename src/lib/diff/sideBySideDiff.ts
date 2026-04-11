@@ -40,6 +40,16 @@ function buildPlainChunks(text: string): DiffChunk[] {
   return [{ text, changed: false }];
 }
 
+function tokenizeDiffLines(patchText: string) {
+  const normalized = patchText
+    .replace(/\r\n/g, "\n")
+    .replace(/\r/g, "\n")
+    .replace(/([^\n])(\\ No newline at end of file)/g, "$1\n$2")
+    .replace(/(\\ No newline at end of file)(?=[+\- ])/g, "$1\n");
+
+  return normalized.split("\n");
+}
+
 function splitChangedChunks(leftText: string, rightText: string) {
   let prefixLength = 0;
   const maxPrefix = Math.min(leftText.length, rightText.length);
@@ -324,7 +334,7 @@ export function parseUnifiedDiff(patchText: string): SideBySideDiffRow[] {
     return [];
   }
 
-  const lines = patchText.replace(/\r\n/g, "\n").split("\n");
+  const lines = tokenizeDiffLines(patchText);
   const rows: SideBySideDiffRow[] = [];
   let index = 0;
   let oldLine = 0;
@@ -415,6 +425,22 @@ export function parseUnifiedDiff(patchText: string): SideBySideDiffRow[] {
         if (entry.type === "pair") {
           const leftText = entry.left ?? "";
           const rightText = entry.right ?? "";
+
+          if (leftText === rightText) {
+            rows.push({
+              kind: "context",
+              leftNumber: String(oldLine),
+              rightNumber: String(newLine),
+              leftText,
+              rightText,
+              leftChunks: buildPlainChunks(leftText),
+              rightChunks: buildPlainChunks(rightText),
+            });
+            oldLine += 1;
+            newLine += 1;
+            continue;
+          }
+
           const { leftChunks, rightChunks } = splitChangedChunks(leftText, rightText);
           rows.push({
             kind: "modified",

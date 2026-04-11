@@ -1346,13 +1346,19 @@ fn load_commit_file_diffs(
             let content = String::from_utf8_lossy(line.content());
 
             match origin {
-                ' ' | '+' | '-' => {
-                    file.patch.push(origin);
-                    file.patch.push_str(&content);
+                ' ' | '+' | '-' => append_patch_line(&mut file.patch, Some(origin), &content),
+                '=' => append_patch_line(&mut file.patch, Some(' '), &content),
+                '>' => {
+                    if !is_no_newline_marker(&content) {
+                        append_patch_line(&mut file.patch, Some('+'), &content);
+                    }
                 }
-                'H' => {
-                    file.patch.push_str(&content);
+                '<' => {
+                    if !is_no_newline_marker(&content) {
+                        append_patch_line(&mut file.patch, Some('-'), &content);
+                    }
                 }
+                'H' => append_patch_line(&mut file.patch, None, &content),
                 _ => {}
             }
         }
@@ -1361,6 +1367,22 @@ fn load_commit_file_diffs(
     .map_err(|error| format!("コミットパッチを読み込めませんでした: {}", error.message()))?;
 
     Ok(files)
+}
+
+fn append_patch_line(buffer: &mut String, prefix: Option<char>, content: &str) {
+    if let Some(prefix) = prefix {
+        buffer.push(prefix);
+    }
+
+    buffer.push_str(content);
+
+    if !content.ends_with('\n') {
+        buffer.push('\n');
+    }
+}
+
+fn is_no_newline_marker(content: &str) -> bool {
+    content.trim() == "\\ No newline at end of file"
 }
 
 fn diff_delta_path(delta: &git2::DiffDelta<'_>) -> String {
