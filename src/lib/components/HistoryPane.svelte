@@ -1,6 +1,7 @@
 <script>
   import { tick } from "svelte";
   import { _ } from "svelte-i18n";
+  import DiffCompareDialog from "./DiffCompareDialog.svelte";
 
   export let repository = null;
   export let error = "";
@@ -287,6 +288,7 @@
       ? clampDetailPanelHeight(detailPanelHeight)
       : defaultDetailPanelHeight;
   let selectedDetailPath = "";
+  let compareDialogOpen = false;
   $: detailFiles = selectedCommitDetail?.files ?? [];
   $: if (detailFiles.length === 0) {
     selectedDetailPath = "";
@@ -296,6 +298,9 @@
   $: selectedDetailFile =
     detailFiles.find((file) => file.path === selectedDetailPath) ?? detailFiles[0] ?? null;
   $: selectedDetailPatchLines = selectedDetailFile ? selectedDetailFile.patch.split("\n") : [];
+  $: if (!selectedDetailFile) {
+    compareDialogOpen = false;
+  }
   $: detailScrollKey = `${selectedCommitOid}:${detailPanelVisible ? "open" : "closed"}`;
   $: if (detailScrollKey !== previousDetailScrollKey) {
     previousDetailScrollKey = detailScrollKey;
@@ -538,8 +543,16 @@
           </aside>
 
           <section class="commit-diff-view">
-            <div class="commit-files-header">
-              {selectedDetailFile ? selectedDetailFile.path : $_("history.details.diff")}
+            <div class="commit-files-header commit-diff-header">
+              <span>{selectedDetailFile ? selectedDetailFile.path : $_("history.details.diff")}</span>
+              <button
+                class="commit-diff-open"
+                type="button"
+                disabled={!selectedDetailFile}
+                on:click={() => (compareDialogOpen = true)}
+              >
+                {$_("history.details.compare")}
+              </button>
             </div>
 
             {#if selectedDetailFile}
@@ -559,6 +572,14 @@
       {/if}
     </section>
   {/if}
+
+  <DiffCompareDialog
+    open={compareDialogOpen}
+    filePath={selectedDetailFile?.path ?? ""}
+    patchText={selectedDetailFile?.patch ?? ""}
+    status={selectedDetailFile?.status ?? ""}
+    onClose={() => (compareDialogOpen = false)}
+  />
 </section>
 
 <style>
@@ -1065,6 +1086,37 @@
     font-size: 0.72rem;
     letter-spacing: 0.08em;
     text-transform: uppercase;
+  }
+
+  .commit-diff-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  .commit-diff-header span {
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .commit-diff-open {
+    flex: 0 0 auto;
+    border: 1px solid rgba(120, 148, 177, 0.12);
+    border-radius: 8px;
+    background: rgba(12, 24, 38, 0.9);
+    color: #dce7f2;
+    padding: 6px 10px;
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .commit-diff-open:hover:enabled {
+    background: rgba(22, 38, 54, 1);
   }
 
   .commit-files-list ul {

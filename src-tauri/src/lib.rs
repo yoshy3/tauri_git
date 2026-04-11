@@ -1212,7 +1212,19 @@ fn load_commit_file_diffs(
     diff.print(DiffFormat::Patch, |delta, _hunk, line| {
         let path = diff_delta_path(&delta);
         if let Some(file) = files.iter_mut().find(|file| file.path == path) {
-            file.patch.push_str(&String::from_utf8_lossy(line.content()));
+            let origin = line.origin();
+            let content = String::from_utf8_lossy(line.content());
+
+            match origin {
+                ' ' | '+' | '-' => {
+                    file.patch.push(origin);
+                    file.patch.push_str(&content);
+                }
+                'H' => {
+                    file.patch.push_str(&content);
+                }
+                _ => {}
+            }
         }
         true
     })

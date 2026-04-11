@@ -123,8 +123,16 @@
       "filesEmpty": "No changed files in this commit.",
       "diff": "Patch",
       "diffEmpty": "No patch available for this commit.",
+      "compare": "Compare",
       "none": "None"
     }
+  },
+  "diffDialog": {
+    "title": "Side-by-side diff",
+    "before": "Before",
+    "after": "After",
+    "close": "Close diff dialog",
+    "empty": "No comparable diff available."
   },
   "commit": {
     "openPanel": "Open Changes Panel",

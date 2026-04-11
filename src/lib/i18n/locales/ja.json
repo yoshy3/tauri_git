@@ -123,8 +123,16 @@
       "filesEmpty": "このコミットに変更ファイルはありません。",
       "diff": "Patch",
       "diffEmpty": "このコミットに表示できる差分はありません。",
+      "compare": "Compare",
       "none": "なし"
     }
+  },
+  "diffDialog": {
+    "title": "Side-by-side diff",
+    "before": "Before",
+    "after": "After",
+    "close": "差分ダイアログを閉じる",
+    "empty": "表示できる差分がありません。"
   },
   "commit": {
     "openPanel": "Open Changes Panel",
