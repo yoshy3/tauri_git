@@ -45,9 +45,49 @@
   const implementedTopActions = ["Fetch", "Pull", "Push", "Stash", "Discard"];
   const lastRepositoryKey = "tauri-git:last-repository-path";
   const historyBatchSize = 100;
+  const autoRefreshIntervalMs = 2500;
+  let autoRefreshInFlight = false;
+  let appVisible = true;
 
   function t(key, values) {
     return get(_)(key, { values });
+  }
+
+  function buildRepositoryStatusFingerprint(status) {
+    if (!status) {
+      return "";
+    }
+
+    return JSON.stringify({
+      branch: status.branch,
+      head_oid: status.head_oid ?? null,
+      head_summary: status.head_summary ?? null,
+      history_revision: status.history_revision ?? "",
+      has_origin_remote: status.has_origin_remote,
+      is_clean: status.is_clean,
+      entries: status.entries ?? [],
+      local_branches: status.local_branches ?? [],
+      remote_groups: status.remote_groups ?? [],
+      tags: status.tags ?? [],
+      stashes: status.stashes ?? [],
+      submodules: status.submodules ?? [],
+    });
+  }
+
+  function isInteractionBusy() {
+    return (
+      loading ||
+      committing ||
+      commitAndPushing ||
+      stashing ||
+      discarding ||
+      autoRefreshInFlight ||
+      Boolean(topbarBusyAction) ||
+      Boolean(stashBusyAction) ||
+      branchDialogOpen ||
+      deleteDialogOpen ||
+      discardDialogOpen
+    );
   }
 
   function resetHistoryState() {
@@ -555,15 +595,19 @@
     }
   }
 
-  async function loadCommitHistory(path) {
+  async function loadCommitHistory(path, options = {}) {
+    const { preserveSelection = false } = options;
     const requestId = historyRequestId + 1;
     historyRequestId = requestId;
+    const previousSelectedCommitOid = preserveSelection ? selectedCommitOid : "";
     historyCommits = [];
     historyLoading = true;
     historyLoadedAll = false;
-    selectedCommitOid = "";
-    selectedCommitDetail = null;
-    selectedCommitDetailLoading = false;
+    if (!preserveSelection) {
+      selectedCommitOid = "";
+      selectedCommitDetail = null;
+      selectedCommitDetailLoading = false;
+    }
 
     let offset = 0;
 
@@ -600,17 +644,89 @@
     } finally {
       if (requestId === historyRequestId) {
         historyLoading = false;
+        if (preserveSelection && previousSelectedCommitOid && !historyCommits.some((commit) => commit.oid === previousSelectedCommitOid)) {
+          selectedCommitOid = "";
+          selectedCommitDetail = null;
+          selectedCommitDetailLoading = false;
+        }
       }
     }
   }
 
-  onMount(() => {
-    const savedPath = localStorage.getItem(lastRepositoryKey);
-    if (!savedPath) {
+  async function autoRefreshRepository() {
+    if (!repository || !appVisible || isInteractionBusy()) {
       return;
     }
 
+    const repoPath = repository.repo_path;
+    const previousStatus = repository;
+    autoRefreshInFlight = true;
+
+    try {
+      const updated = await invoke("get_repository_status", {
+        path: repoPath,
+      });
+
+      if (!repository || repository.repo_path !== repoPath) {
+        return;
+      }
+
+      const previousFingerprint = buildRepositoryStatusFingerprint(previousStatus);
+      const nextFingerprint = buildRepositoryStatusFingerprint(updated);
+      const historyChanged =
+        previousStatus.history_revision !== updated.history_revision ||
+        previousStatus.head_oid !== updated.head_oid;
+
+      if (previousFingerprint !== nextFingerprint) {
+        repository = updated;
+      }
+
+      if (historyChanged) {
+        void loadCommitHistory(repoPath, { preserveSelection: true });
+      }
+    } catch (_message) {
+      // Ignore transient auto-refresh failures and keep the current UI state.
+    } finally {
+      autoRefreshInFlight = false;
+    }
+  }
+
+  onMount(() => {
+    const handleVisibilityChange = () => {
+      appVisible = document.visibilityState === "visible";
+      if (appVisible) {
+        void autoRefreshRepository();
+      }
+    };
+
+    const handleWindowFocus = () => {
+      appVisible = true;
+      void autoRefreshRepository();
+    };
+
+    appVisible = document.visibilityState === "visible";
+    const intervalId = window.setInterval(() => {
+      void autoRefreshRepository();
+    }, autoRefreshIntervalMs);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("focus", handleWindowFocus);
+
+    const savedPath = localStorage.getItem(lastRepositoryKey);
+    if (!savedPath) {
+      return () => {
+        window.clearInterval(intervalId);
+        document.removeEventListener("visibilitychange", handleVisibilityChange);
+        window.removeEventListener("focus", handleWindowFocus);
+      };
+    }
+
     void openRepositoryAt(savedPath, { remember: false, clearSavedOnError: true });
+
+    return () => {
+      window.clearInterval(intervalId);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("focus", handleWindowFocus);
+    };
   });
 
   $: changedEntries = repository ? repository.entries : [];

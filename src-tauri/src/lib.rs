@@ -20,6 +20,8 @@ struct GitStatusResponse {
     repo_name: String,
     repo_path: String,
     branch: String,
+    head_oid: Option<String>,
+    history_revision: String,
     has_origin_remote: bool,
     is_clean: bool,
     entries: Vec<GitStatusEntry>,
@@ -341,6 +343,12 @@ fn build_repository_status(repository: &mut Repository) -> Result<GitStatusRespo
             let summary = commit.summary().unwrap_or("(no summary)");
             format!("{short_id} {summary}")
         });
+    let head_oid = repository
+        .head()
+        .ok()
+        .and_then(|head| head.target())
+        .map(|oid| oid.to_string());
+    let history_revision = build_history_revision(repository)?;
 
     let local_branches = load_local_branches(repository)?;
     let remote_groups = load_remote_groups(repository)?;
@@ -353,6 +361,8 @@ fn build_repository_status(repository: &mut Repository) -> Result<GitStatusRespo
         repo_name,
         repo_path,
         branch,
+        head_oid,
+        history_revision,
         has_origin_remote,
         is_clean: entries.is_empty(),
         entries,
@@ -1078,6 +1088,45 @@ fn has_remote(repository: &Repository, remote_name: &str) -> Result<bool, String
         .map_err(|error| format!("failed to inspect remotes: {}", error.message()))?;
 
     Ok(remotes.iter().flatten().any(|name| name == remote_name))
+}
+
+fn build_history_revision(repository: &Repository) -> Result<String, String> {
+    let mut entries = Vec::new();
+
+    if let Ok(head) = repository.head() {
+        if let Some(target) = head.target() {
+            entries.push(format!("HEAD={target}"));
+        }
+    }
+
+    let references = repository
+        .references()
+        .map_err(|error| format!("履歴リビジョン情報を取得できませんでした: {}", error.message()))?;
+
+    for reference_result in references {
+        let reference =
+            reference_result.map_err(|error| format!("参照情報を読み込めませんでした: {}", error.message()))?;
+        let Some(name) = reference.name() else {
+            continue;
+        };
+
+        if !(name.starts_with("refs/heads/")
+            || name.starts_with("refs/remotes/")
+            || name.starts_with("refs/tags/"))
+        {
+            continue;
+        }
+
+        let target = reference
+            .target()
+            .map(|oid| oid.to_string())
+            .unwrap_or_else(|| "none".to_string());
+
+        entries.push(format!("{name}={target}"));
+    }
+
+    entries.sort();
+    Ok(entries.join("|"))
 }
 
 fn tree_is_unchanged(

@@ -27,6 +27,7 @@ Tauri Git is a desktop Git client focused on a compact workflow:
 ## Current Features
 
 - Repository picker and last-opened repository restore
+- Auto-refresh when repository files or refs change
 - Working tree status list
 - Commit history with labels for local and remote refs
 - Commit detail panel with author / committer / refs / parents / changed files
