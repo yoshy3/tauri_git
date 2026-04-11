@@ -62,6 +62,15 @@
                 <path d="M3 8.25 8 11l5-2.75" />
                 <path d="M3 11.25 8 14l5-2.75" />
               </svg>
+            {:else if iconType(action) === "discard"}
+              <svg viewBox="0 0 16 16" fill="none">
+                <path d="M3.75 4.5h8.5" />
+                <path d="M6.25 2.75h3.5" />
+                <path d="M5 4.5v7.25" />
+                <path d="M8 4.5v7.25" />
+                <path d="M11 4.5v7.25" />
+                <path d="M4.5 4.5l.6 8.1c.04.5.45.9.95.9h3.9c.5 0 .91-.4.95-.9l.6-8.1" />
+              </svg>
             {/if}
           </span>
           {activeAction === action ? $_("topbar.syncing") : $_(actionKey(action))}

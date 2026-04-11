@@ -9,6 +9,7 @@
     "openRepositoryFirst": "先にリポジトリを開いてください。",
     "commitMessageEmpty": "コミットメッセージが空です。",
     "stashFilesEmpty": "stash するファイルを 1 つ以上選択してください。",
+    "discardFilesEmpty": "破棄するファイルを 1 つ以上選択してください。",
     "branchNameEmpty": "ブランチ名が空です。"
   },
   "topbar": {
@@ -18,9 +19,20 @@
     "pull": "Pull",
     "push": "Push",
     "stash": "Stash",
+    "discard": "Discard",
     "pop": "Pop",
     "refresh": "Refresh",
     "syncing": "Syncing..."
+  },
+  "discardDialog": {
+    "title": "変更を破棄",
+    "description": "選択した {count} 件の変更を破棄しますか。この操作は元に戻せません。",
+    "targetLabel": "破棄対象",
+    "selectionCount": "{count} 件を選択中",
+    "warning": "追跡済みの変更は HEAD に戻し、新規追加ファイルは削除します。",
+    "confirm": "破棄する",
+    "discarding": "破棄中...",
+    "cancel": "キャンセル"
   },
   "push": {
     "missingOriginTitle": "origin が設定されていません",
@@ -33,7 +45,7 @@
     "fromSource": "{source} から新しいブランチを作成します。",
     "nameLabel": "ブランチ名",
     "namePlaceholder": "feature/new-branch",
-    "switchAfterCreate": "作成後に自動で切り替える",
+    "switchAfterCreate": "作成後にそのブランチへ切り替える",
     "cancel": "キャンセル",
     "create": "ブランチを作成",
     "creating": "作成中..."
@@ -104,6 +116,7 @@
     "panelTabs": "Changes panel tabs",
     "commitTab": "Commit",
     "stashTab": "Stash",
+    "discardTab": "Discard",
     "filesTitle": "Changed Files ({count})",
     "filesCaption": "現在の作業ツリーで変更されているファイルです。",
     "filesEmpty": "コミットできる変更はありません。",
@@ -117,13 +130,22 @@
     "stashEmpty": "stash できる変更はありません。",
     "stashAction": "Stash を作成",
     "stashing": "stash 作成中...",
+    "discardTitle": "変更を破棄",
+    "discardCaption": "作業ツリーとインデックスから戻したいファイルを選択します。",
+    "discardWarning": "選択した変更は作業ツリーから削除されます。新規追加ファイルは削除されます。",
+    "discardSelectionCount": "{count} 件選択中",
+    "discardEmpty": "破棄できる変更はありません。",
+    "discardAction": "選択した変更を破棄",
+    "discarding": "破棄中...",
     "commitTitle": "Create Commit",
     "summaryLabel": "Summary (必須)",
     "summaryPlaceholder": "短いコミット要約",
     "descriptionLabel": "Description",
-    "descriptionPlaceholder": "必要に応じて詳しい説明を入力",
+    "descriptionPlaceholder": "必要なら詳しい説明を入力",
     "committing": "コミット中...",
+    "commitAndPushing": "コミットと Push を実行中...",
     "commitToBranch": "{branch} にコミット",
+    "commitAndPushToBranch": "{branch} に Commit & Push",
     "branchFallback": "ブランチ"
   },
   "status": {

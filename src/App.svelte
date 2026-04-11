@@ -1,7 +1,7 @@
 <script>
   import { onMount } from "svelte";
   import { invoke } from "@tauri-apps/api/core";
-  import { confirm, open } from "@tauri-apps/plugin-dialog";
+  import { open } from "@tauri-apps/plugin-dialog";
   import { _ } from "svelte-i18n";
   import { get } from "svelte/store";
   import TopBar from "./lib/components/TopBar.svelte";
@@ -13,7 +13,9 @@
   let error = "";
   let loading = false;
   let committing = false;
+  let commitAndPushing = false;
   let stashing = false;
+  let discarding = false;
   let topbarBusyAction = "";
   let stashBusyAction = "";
   let selectedStashIndex = null;
@@ -32,9 +34,11 @@
   let deleteBranchNameDraft = "";
   let deleteTargetRef = null;
   let deleteForceEnabled = false;
+  let discardDialogOpen = false;
+  let discardPendingPaths = [];
 
-  const topActions = ["Fetch", "Pull", "Push", "Stash"];
-  const implementedTopActions = ["Fetch", "Pull", "Push", "Stash"];
+  const topActions = ["Fetch", "Pull", "Push", "Stash", "Discard"];
+  const implementedTopActions = ["Fetch", "Pull", "Push", "Stash", "Discard"];
   const lastRepositoryKey = "tauri-git:last-repository-path";
   const historyBatchSize = 100;
 
@@ -60,6 +64,11 @@
     deleteBranchNameDraft = "";
     deleteTargetRef = null;
     deleteForceEnabled = false;
+  }
+
+  function resetDiscardDialog() {
+    discardDialogOpen = false;
+    discardPendingPaths = [];
   }
 
   function closeBranchMenu() {
@@ -150,19 +159,14 @@
       return;
     }
 
-    if (action === "Stash") {
+    if (action === "Stash" || action === "Discard") {
       rightPaneExpanded = true;
-      rightPaneTab = "stash";
+      rightPaneTab = action.toLowerCase();
       return;
     }
 
     if (action === "Push" && !repository.has_origin_remote) {
-      await confirm(t("push.missingOriginMessage"), {
-        title: t("push.missingOriginTitle"),
-        kind: "warning",
-        okLabel: t("push.dialogOk"),
-        cancelLabel: t("push.dialogCancel"),
-      });
+      error = t("push.missingOriginMessage");
       return;
     }
 
@@ -269,6 +273,42 @@
     rightPaneTab = "commit";
   }
 
+  async function commitAndPushChanges(message) {
+    if (!repository) {
+      error = t("errors.openRepositoryFirst");
+      return false;
+    }
+
+    if (!message.trim()) {
+      error = t("errors.commitMessageEmpty");
+      return false;
+    }
+
+    if (!repository.has_origin_remote) {
+      error = t("push.missingOriginMessage");
+      return false;
+    }
+
+    commitAndPushing = true;
+    error = "";
+    try {
+      const updated = await invoke("commit_and_push", {
+        path: repository.repo_path,
+        message,
+      });
+      repository = updated;
+      rightPaneExpanded = false;
+      rightPaneTab = "commit";
+      void loadCommitHistory(repository.repo_path);
+      return true;
+    } catch (messageText) {
+      error = String(messageText);
+      return false;
+    } finally {
+      commitAndPushing = false;
+    }
+  }
+
   async function checkoutBranch(branchName, remoteName = null) {
     if (!repository) {
       error = t("errors.openRepositoryFirst");
@@ -294,6 +334,48 @@
       error = String(message);
     } finally {
       loading = false;
+    }
+  }
+
+  async function discardChanges(selectedPaths) {
+    if (!repository) {
+      error = t("errors.openRepositoryFirst");
+      return false;
+    }
+
+    if (!selectedPaths.length) {
+      error = t("errors.discardFilesEmpty");
+      return false;
+    }
+
+    discardPendingPaths = [...selectedPaths];
+    discardDialogOpen = true;
+    error = "";
+    return false;
+  }
+
+  async function confirmDiscardChanges() {
+    if (!repository || discardPendingPaths.length === 0) {
+      resetDiscardDialog();
+      return;
+    }
+
+    discarding = true;
+    error = "";
+
+    try {
+      repository = await invoke("discard_changes", {
+        path: repository.repo_path,
+        selectedPaths: discardPendingPaths,
+      });
+      resetDiscardDialog();
+      rightPaneExpanded = false;
+      rightPaneTab = "commit";
+      void loadCommitHistory(repository.repo_path);
+    } catch (messageText) {
+      error = String(messageText);
+    } finally {
+      discarding = false;
     }
   }
 
@@ -587,11 +669,15 @@
       expanded={rightPaneExpanded}
       activeTab={rightPaneTab}
       {committing}
+      {commitAndPushing}
       {stashing}
+      {discarding}
       onToggle={toggleRightPane}
       onSelectTab={(tab) => (rightPaneTab = tab)}
       onStash={stashChanges}
+      onDiscard={discardChanges}
       onCommit={commitChanges}
+      onCommitAndPush={commitAndPushChanges}
     />
   </main>
 
@@ -663,6 +749,33 @@
             disabled={loading || deleteBranchNameDraft.trim() !== deleteTargetRef.displayName}
           >
             {loading ? t("branchDelete.deleting") : t("branchDelete.delete")}
+          </button>
+        </div>
+      </section>
+    </div>
+  {/if}
+
+  {#if discardDialogOpen}
+    <div class="dialog-backdrop" role="presentation" on:click={(event) => event.target === event.currentTarget && !discarding && resetDiscardDialog()}>
+      <section class="dialog-card" role="dialog" aria-modal="true" aria-labelledby="discard-dialog-title">
+        <div class="dialog-copy">
+          <h2 id="discard-dialog-title">{t("discardDialog.title")}</h2>
+          <p>{t("discardDialog.description", { count: discardPendingPaths.length })}</p>
+        </div>
+
+        <div class="dialog-warning">
+          <span class="dialog-warning-label">{t("discardDialog.targetLabel")}</span>
+          <code>{t("discardDialog.selectionCount", { count: discardPendingPaths.length })}</code>
+        </div>
+
+        <p class="dialog-helper">{t("discardDialog.warning")}</p>
+
+        <div class="dialog-actions">
+          <button class="dialog-button dialog-button-muted" type="button" on:click={resetDiscardDialog} disabled={discarding}>
+            {t("discardDialog.cancel")}
+          </button>
+          <button class="dialog-button dialog-button-danger" type="button" on:click={confirmDiscardChanges} disabled={discarding}>
+            {discarding ? t("discardDialog.discarding") : t("discardDialog.confirm")}
           </button>
         </div>
       </section>

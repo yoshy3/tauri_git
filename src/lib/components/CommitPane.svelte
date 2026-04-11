@@ -6,16 +6,21 @@
   export let expanded = false;
   export let activeTab = "commit";
   export let committing = false;
+  export let commitAndPushing = false;
   export let stashing = false;
+  export let discarding = false;
   export let onToggle = () => {};
   export let onSelectTab = () => {};
   export let onStash = async () => false;
+  export let onDiscard = async () => false;
   export let onCommit = async () => false;
+  export let onCommitAndPush = async () => false;
 
   let commitSummary = "";
   let commitDescription = "";
   let stashMessage = "";
   let stashSelectedPaths = [];
+  let discardSelectedPaths = [];
   let currentRepoPath = "";
   let currentChangeSelectionKey = "";
 
@@ -86,6 +91,53 @@
     stashSelectedPaths = [];
   }
 
+  async function handleCommitAndPush() {
+    const summary = commitSummary.trim();
+    const description = commitDescription.trim();
+
+    if (!summary) {
+      const success = await onCommitAndPush("");
+      if (success) {
+        commitSummary = "";
+        commitDescription = "";
+      }
+      return;
+    }
+
+    const message = description ? `${summary}\n\n${description}` : summary;
+    const success = await onCommitAndPush(message);
+
+    if (success) {
+      commitSummary = "";
+      commitDescription = "";
+    }
+  }
+
+  function isDiscardPathSelected(path) {
+    return discardSelectedPaths.includes(path);
+  }
+
+  function setDiscardPathSelected(path, selected) {
+    if (selected) {
+      if (discardSelectedPaths.includes(path)) {
+        return;
+      }
+
+      discardSelectedPaths = [...discardSelectedPaths, path];
+      return;
+    }
+
+    discardSelectedPaths = discardSelectedPaths.filter((entryPath) => entryPath !== path);
+  }
+
+  function selectAllDiscardPaths() {
+    discardSelectedPaths = changedEntries.map((entry) => entry.path);
+  }
+
+  function clearSelectedDiscardPaths() {
+    discardSelectedPaths = [];
+  }
+
   async function handleStash() {
     if (!stashMessage.trim()) {
       return;
@@ -99,6 +151,14 @@
     }
   }
 
+  async function handleDiscard() {
+    const success = await onDiscard(discardSelectedPaths);
+
+    if (success) {
+      discardSelectedPaths = [];
+    }
+  }
+
   $: nextRepoPath = repository?.repo_path ?? "";
   $: if (nextRepoPath !== currentRepoPath) {
     currentRepoPath = nextRepoPath;
@@ -106,9 +166,11 @@
     commitDescription = "";
     stashMessage = "";
     stashSelectedPaths = changedEntries.map((entry) => entry.path);
+    discardSelectedPaths = changedEntries.map((entry) => entry.path);
   }
   $: changedEntryPaths = changedEntries.map((entry) => entry.path);
   $: selectedStashPathSet = new Set(stashSelectedPaths);
+  $: selectedDiscardPathSet = new Set(discardSelectedPaths);
   $: changeSelectionKey = `${currentRepoPath}::${changedEntryPaths.join("\u0001")}`;
   $: if (changeSelectionKey !== currentChangeSelectionKey) {
     currentChangeSelectionKey = changeSelectionKey;
@@ -117,6 +179,11 @@
     stashSelectedPaths =
       preservedPaths.length > 0 || changedEntryPaths.length === 0
         ? preservedPaths
+        : [...changedEntryPaths];
+    const preservedDiscardPaths = discardSelectedPaths.filter((path) => validPaths.has(path));
+    discardSelectedPaths =
+      preservedDiscardPaths.length > 0 || changedEntryPaths.length === 0
+        ? preservedDiscardPaths
         : [...changedEntryPaths];
   }
 </script>
@@ -151,6 +218,16 @@
         on:click={() => onSelectTab("stash")}
       >
         {$_("commit.stashTab")}
+      </button>
+      <button
+        class:panel-tab-active={activeTab === "discard"}
+        class="panel-tab"
+        type="button"
+        role="tab"
+        aria-selected={activeTab === "discard"}
+        on:click={() => onSelectTab("discard")}
+      >
+        {$_("commit.discardTab")}
       </button>
       <button class="panel-tab panel-tab-close" type="button" aria-label={$_("commit.closePanel")} on:click={onToggle}>
         &gt;&gt;
@@ -244,6 +321,61 @@
             {stashing ? $_("commit.stashing") : $_("commit.stashAction")}
           </button>
         </div>
+      {:else if activeTab === "discard"}
+        <div class="action-block">
+          <div class="action-block-copy">
+            <h2>{$_("commit.discardTitle")}</h2>
+            <p class="changes-caption">{$_("commit.discardCaption")}</p>
+          </div>
+
+          <div class="discard-warning">
+            {$_("commit.discardWarning")}
+          </div>
+
+          <div class="stash-selection-toolbar">
+            <span>{$_("commit.discardSelectionCount", { values: { count: discardSelectedPaths.length } })}</span>
+            <div class="stash-selection-actions">
+              <button class="secondary" type="button" on:click={selectAllDiscardPaths} disabled={changedEntries.length === 0 || discarding}>
+                {$_("commit.selectAll")}
+              </button>
+              <button class="secondary" type="button" on:click={clearSelectedDiscardPaths} disabled={discardSelectedPaths.length === 0 || discarding}>
+                {$_("commit.clear")}
+              </button>
+            </div>
+          </div>
+
+          <div class="stash-selection-list">
+            {#if changedEntries.length > 0}
+              {#each changedEntries as entry (entry.path)}
+                <label class:selected={selectedDiscardPathSet.has(entry.path)} class="stash-selection-item discard-selection-item">
+                  <input
+                    type="checkbox"
+                    checked={isDiscardPathSelected(entry.path)}
+                    disabled={discarding}
+                    on:change={(event) => setDiscardPathSelected(entry.path, event.currentTarget.checked)}
+                  />
+                  <span class:file-status={true} class:warning={entry.working_tree_status !== "."} class:ok={entry.working_tree_status === "."}>
+                    {statusLabel(entry)}
+                  </span>
+                  <div class="stash-selection-copy">
+                    <strong title={entry.path}>{entry.path}</strong>
+                  </div>
+                </label>
+              {/each}
+            {:else}
+              <p class="empty-side">{$_("commit.discardEmpty")}</p>
+            {/if}
+          </div>
+
+          <button
+            class="primary wide danger"
+            type="button"
+            on:click={handleDiscard}
+            disabled={!repository || discarding || discardSelectedPaths.length === 0}
+          >
+            {discarding ? $_("commit.discarding") : $_("commit.discardAction")}
+          </button>
+        </div>
       {:else}
         <div class="action-block">
           <div class="action-block-copy">
@@ -260,13 +392,27 @@
             <textarea bind:value={commitDescription} rows="6" placeholder={$_("commit.descriptionPlaceholder")}></textarea>
           </label>
 
-          <button class="primary wide" on:click={handleCommit} disabled={!repository || committing || repository.is_clean}>
-            {committing
-              ? $_("commit.committing")
-              : $_("commit.commitToBranch", {
-                  values: { branch: repository ? repository.branch : $_("commit.branchFallback") },
-                })}
-          </button>
+          <div class="commit-actions">
+            <button class="primary wide" on:click={handleCommit} disabled={!repository || committing || commitAndPushing || repository.is_clean}>
+              {committing
+                ? $_("commit.committing")
+                : $_("commit.commitToBranch", {
+                    values: { branch: repository ? repository.branch : $_("commit.branchFallback") },
+                  })}
+            </button>
+
+            <button
+              class="primary wide secondary-primary"
+              on:click={handleCommitAndPush}
+              disabled={!repository || committing || commitAndPushing || repository.is_clean || !repository.has_origin_remote}
+            >
+              {commitAndPushing
+                ? $_("commit.commitAndPushing")
+                : $_("commit.commitAndPushToBranch", {
+                    values: { branch: repository ? repository.branch : $_("commit.branchFallback") },
+                  })}
+            </button>
+          </div>
         </div>
       {/if}
     </section>
@@ -457,7 +603,7 @@
 
   .panel-tabs {
     display: grid;
-    grid-template-columns: 1fr 1fr 48px;
+    grid-template-columns: 1fr 1fr 1fr 48px;
     gap: 6px;
     flex: 0 0 38px;
     align-items: stretch;
@@ -572,6 +718,22 @@
     box-shadow: inset 0 0 0 1px rgba(77, 160, 255, 0.12);
   }
 
+  .discard-warning {
+    padding: 10px 12px;
+    border-radius: 8px;
+    background: rgba(143, 64, 42, 0.16);
+    border: 1px solid rgba(193, 101, 71, 0.28);
+    color: #ffd7cb;
+    font-size: 0.76rem;
+    line-height: 1.45;
+  }
+
+  .discard-selection-item.selected {
+    border-color: rgba(204, 110, 84, 0.62);
+    background: linear-gradient(180deg, rgba(63, 28, 22, 0.9), rgba(47, 20, 16, 0.9));
+    box-shadow: inset 0 0 0 1px rgba(214, 118, 92, 0.12);
+  }
+
   .stash-selection-item input[type="checkbox"] {
     margin: 3px 0 0;
     accent-color: #4da0ff;
@@ -622,10 +784,31 @@
     background: linear-gradient(180deg, #2673bf, #1160ae);
   }
 
+  .primary.danger {
+    background: linear-gradient(180deg, #9a4a34, #7d3526);
+  }
+
+  .primary.danger:hover:enabled {
+    background: linear-gradient(180deg, #af563f, #92402f);
+  }
+
   .wide {
     width: 100%;
     padding: 10px 12px;
     margin-top: 8px;
+  }
+
+  .commit-actions {
+    display: grid;
+    gap: 8px;
+  }
+
+  .secondary-primary {
+    background: linear-gradient(180deg, #286b57, #185240);
+  }
+
+  .secondary-primary:hover:enabled {
+    background: linear-gradient(180deg, #317a64, #1d624d);
   }
 
   @media (max-width: 1180px) {

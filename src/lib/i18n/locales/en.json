@@ -9,6 +9,7 @@
     "openRepositoryFirst": "Open a repository first.",
     "commitMessageEmpty": "Commit message is empty.",
     "stashFilesEmpty": "Select at least one file to stash.",
+    "discardFilesEmpty": "Select at least one file to discard.",
     "branchNameEmpty": "Branch name is empty."
   },
   "topbar": {
@@ -18,9 +19,20 @@
     "pull": "Pull",
     "push": "Push",
     "stash": "Stash",
+    "discard": "Discard",
     "pop": "Pop",
     "refresh": "Refresh",
     "syncing": "Syncing..."
+  },
+  "discardDialog": {
+    "title": "Discard Changes",
+    "description": "Discard changes for {count} selected files? This cannot be undone.",
+    "targetLabel": "Discard target",
+    "selectionCount": "{count} selected files",
+    "warning": "Tracked changes are restored to HEAD. Newly added files are removed.",
+    "confirm": "Discard",
+    "discarding": "Discarding...",
+    "cancel": "Cancel"
   },
   "push": {
     "missingOriginTitle": "Origin not configured",
@@ -104,6 +116,7 @@
     "panelTabs": "Changes panel tabs",
     "commitTab": "Commit",
     "stashTab": "Stash",
+    "discardTab": "Discard",
     "filesTitle": "Changed Files ({count})",
     "filesCaption": "Files currently changed in the working tree.",
     "filesEmpty": "No changes available to commit.",
@@ -117,13 +130,22 @@
     "stashEmpty": "No changes available to stash.",
     "stashAction": "Create Stash",
     "stashing": "Stashing...",
+    "discardTitle": "Discard Changes",
+    "discardCaption": "Choose files to revert from the working tree and index.",
+    "discardWarning": "Selected changes will be removed from the working tree. Newly added files are deleted.",
+    "discardSelectionCount": "{count} files selected",
+    "discardEmpty": "No changes available to discard.",
+    "discardAction": "Discard Selected Changes",
+    "discarding": "Discarding...",
     "commitTitle": "Create Commit",
     "summaryLabel": "Summary (required)",
     "summaryPlaceholder": "Short commit summary",
     "descriptionLabel": "Description",
     "descriptionPlaceholder": "Optional longer description",
     "committing": "Committing...",
+    "commitAndPushing": "Commit & Push...",
     "commitToBranch": "Commit to {branch}",
+    "commitAndPushToBranch": "Commit & Push to {branch}",
     "branchFallback": "branch"
   },
   "status": {

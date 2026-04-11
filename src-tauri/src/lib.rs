@@ -91,6 +91,14 @@ fn commit_all(path: String, message: String) -> Result<GitStatusResponse, String
 }
 
 #[tauri::command]
+fn commit_and_push(path: String, message: String) -> Result<GitStatusResponse, String> {
+    let mut repository = open_repo(&path)?;
+    create_commit(&repository, &message)?;
+    push_current_branch_to_origin(&repository)?;
+    build_repository_status(&mut repository)
+}
+
+#[tauri::command]
 fn fetch_origin(path: String) -> Result<GitStatusResponse, String> {
     let mut repository = open_repo(&path)?;
     fetch_default_remote(&repository)?;
@@ -170,6 +178,13 @@ fn stash_changes(
 ) -> Result<GitStatusResponse, String> {
     let mut repository = open_repo(&path)?;
     create_stash(&mut repository, message.as_deref(), &selected_paths)?;
+    build_repository_status(&mut repository)
+}
+
+#[tauri::command]
+fn discard_changes(path: String, selected_paths: Vec<String>) -> Result<GitStatusResponse, String> {
+    let mut repository = open_repo(&path)?;
+    discard_selected_changes(&repository, &selected_paths)?;
     build_repository_status(&mut repository)
 }
 
@@ -721,6 +736,112 @@ fn create_stash(
     Ok(())
 }
 
+fn discard_selected_changes(repository: &Repository, selected_paths: &[String]) -> Result<(), String> {
+    if selected_paths.is_empty() {
+        return Err("discard する変更がありません。".to_string());
+    }
+
+    let mut status_options = StatusOptions::new();
+    status_options
+        .include_untracked(true)
+        .recurse_untracked_dirs(true)
+        .include_ignored(false)
+        .renames_head_to_index(true)
+        .renames_index_to_workdir(true);
+
+    let statuses = repository
+        .statuses(Some(&mut status_options))
+        .map_err(|error| format!("discard 対象を確認できませんでした: {}", error.message()))?;
+
+    if statuses.is_empty() {
+        return Err("discard できる変更がありません。".to_string());
+    }
+
+    let selected_path_set = selected_paths
+        .iter()
+        .map(|path| path.as_str())
+        .collect::<std::collections::HashSet<_>>();
+    let mut restore_paths = Vec::new();
+    let mut remove_paths = Vec::new();
+
+    for entry in statuses.iter() {
+        let Some(path) = entry.path() else {
+            continue;
+        };
+
+        if !selected_path_set.contains(path) {
+            continue;
+        }
+
+        let status = entry.status();
+        if status.contains(Status::INDEX_NEW) || status.contains(Status::WT_NEW) {
+            remove_paths.push(path.to_string());
+        } else {
+            restore_paths.push(path.to_string());
+        }
+    }
+
+    if restore_paths.is_empty() && remove_paths.is_empty() {
+        return Err("discard 対象のファイルを選択してください。".to_string());
+    }
+
+    let repo_root = repository_root(repository)?;
+
+    if !restore_paths.is_empty() {
+        let mut command = Command::new("git");
+        command
+            .current_dir(&repo_root)
+            .arg("restore")
+            .arg("--source=HEAD")
+            .arg("--staged")
+            .arg("--worktree")
+            .arg("--");
+
+        for path in &restore_paths {
+            command.arg(path);
+        }
+
+        run_git_command(command, "discard")?;
+    }
+
+    if !remove_paths.is_empty() {
+        let mut tracked_removals = Vec::new();
+        let mut untracked_removals = Vec::new();
+
+        for path in &remove_paths {
+            if repository.find_path_in_head(path).unwrap_or(false) {
+                tracked_removals.push(path.clone());
+            } else {
+                untracked_removals.push(path.clone());
+            }
+        }
+
+        if !tracked_removals.is_empty() {
+            let mut command = Command::new("git");
+            command.current_dir(&repo_root).arg("rm").arg("-f").arg("--");
+
+            for path in &tracked_removals {
+                command.arg(path);
+            }
+
+            run_git_command(command, "discard")?;
+        }
+
+        if !untracked_removals.is_empty() {
+            let mut command = Command::new("git");
+            command.current_dir(&repo_root).arg("clean").arg("-fd").arg("--");
+
+            for path in &untracked_removals {
+                command.arg(path);
+            }
+
+            run_git_command(command, "discard")?;
+        }
+    }
+
+    Ok(())
+}
+
 fn apply_stash_entry(repository: &mut Repository, index: usize) -> Result<(), String> {
     match repository.stash_apply(index, None) {
         Ok(()) => {
@@ -781,6 +902,51 @@ fn repository_root(repository: &Repository) -> Result<PathBuf, String> {
         .or_else(|| repository.path().parent())
         .ok_or_else(|| "リポジトリのルートパスを解決できませんでした。".to_string())
         .map(|path| path.to_path_buf())
+}
+
+fn run_git_command(mut command: Command, action_name: &str) -> Result<(), String> {
+    let output = command
+        .output()
+        .map_err(|error| format!("{action_name} コマンドを実行できませんでした: {}", error))?;
+
+    if output.status.success() {
+        return Ok(());
+    }
+
+    let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+    let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    let detail = if !stderr.is_empty() {
+        stderr
+    } else if !stdout.is_empty() {
+        stdout
+    } else {
+        "詳細なエラーを取得できませんでした。".to_string()
+    };
+
+    Err(format!("{action_name} に失敗しました: {detail}"))
+}
+
+trait RepositoryHeadExt {
+    fn find_path_in_head(&self, path: &str) -> Result<bool, String>;
+}
+
+impl RepositoryHeadExt for Repository {
+    fn find_path_in_head(&self, path: &str) -> Result<bool, String> {
+        let head = match self.head() {
+            Ok(head) => head,
+            Err(_) => return Ok(false),
+        };
+        let tree = match head.peel_to_tree() {
+            Ok(tree) => tree,
+            Err(_) => return Ok(false),
+        };
+
+        match tree.get_path(std::path::Path::new(path)) {
+            Ok(_) => Ok(true),
+            Err(error) if error.code() == git2::ErrorCode::NotFound => Ok(false),
+            Err(error) => Err(format!("HEAD のファイル状態を確認できませんでした: {}", error.message())),
+        }
+    }
 }
 
 fn has_remote(repository: &Repository, remote_name: &str) -> Result<bool, String> {
@@ -1169,6 +1335,7 @@ pub fn run() {
             open_repository,
             get_repository_status,
             commit_all,
+            commit_and_push,
             fetch_origin,
             pull_current_branch,
             push_current_branch,
@@ -1176,6 +1343,7 @@ pub fn run() {
             create_branch,
             delete_branch,
             stash_changes,
+            discard_changes,
             apply_stash,
             pop_stash,
             get_commit_history_chunk
