@@ -1039,6 +1039,7 @@ fn repository_root(repository: &Repository) -> Result<PathBuf, String> {
 }
 
 fn git_command() -> Command {
+    #[allow(unused_mut)]
     let mut command = Command::new("git");
     #[cfg(windows)]
     command.creation_flags(CREATE_NO_WINDOW);

@@ -108,6 +108,8 @@
     "loadingBody": "The list updates as chunks arrive.",
     "emptyTitle": "No commit history available.",
     "emptyBody": "Open a repository or create the first commit.",
+    "filteredEmptyTitle": "No commits match the current search.",
+    "filteredEmptyBody": "Try a different keyword or clear the search box.",
     "details": {
       "loadingTitle": "Loading commit details.",
       "loadingBody": "Commit metadata and patch are being loaded.",

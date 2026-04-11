@@ -13,6 +13,7 @@
   export let selectedCommitDetailLoading = false;
   export let onSelectCommit = () => {};
   export let onCloseCommitDetail = () => {};
+  let searchQuery = "";
 
   const graphLaneSpacing = 14;
   const graphPadding = 10;
@@ -58,6 +59,22 @@
       return "patch-line patch-line-removed";
     }
     return "patch-line";
+  }
+
+  function matchesHistorySearch(commit, normalizedQuery) {
+    if (!normalizedQuery) {
+      return true;
+    }
+
+    const haystacks = [
+      commit.summary,
+      commit.author,
+      commit.id,
+      commit.oid,
+      ...(commit.labels?.map((label) => label.name) ?? []),
+    ];
+
+    return haystacks.some((value) => value?.toLowerCase().includes(normalizedQuery));
   }
 
   function clampDetailPanelHeight(height) {
@@ -267,7 +284,9 @@
     }));
   }
 
-  $: historyGraphRows = buildGraphRows(historyCommits);
+  $: normalizedSearchQuery = searchQuery.trim().toLowerCase();
+  $: filteredHistoryCommits = historyCommits.filter((commit) => matchesHistorySearch(commit, normalizedSearchQuery));
+  $: historyGraphRows = buildGraphRows(filteredHistoryCommits);
   $: historyGraphWidth = Math.max(
     historyGraphRows.length > 0 ? historyGraphRows[0].graphWidth : 0,
     56,
@@ -301,6 +320,9 @@
   $: if (!selectedDetailFile) {
     compareDialogOpen = false;
   }
+  $: if (selectedCommitOid && !filteredHistoryCommits.some((commit) => commit.oid === selectedCommitOid)) {
+    compareDialogOpen = false;
+  }
   $: detailScrollKey = `${selectedCommitOid}:${detailPanelVisible ? "open" : "closed"}`;
   $: if (detailScrollKey !== previousDetailScrollKey) {
     previousDetailScrollKey = detailScrollKey;
@@ -314,11 +336,11 @@
 
 <section class="center-pane">
   <div class="history-toolbar">
-    <input class="search" placeholder={$_("history.searchPlaceholder")} disabled={!repository} />
+    <input class="search" bind:value={searchQuery} placeholder={$_("history.searchPlaceholder")} disabled={!repository} />
     <div class="history-meta">
       {#if repository}
         <span>{repository.branch}</span>
-        <span>{$_("history.commitCount", { values: { count: historyCommits.length } })}</span>
+        <span>{$_("history.commitCount", { values: { count: filteredHistoryCommits.length } })}</span>
         <span>{historyLoading ? $_("history.loading") : historyLoadedAll ? $_("history.complete") : ""}</span>
       {/if}
     </div>
@@ -341,7 +363,7 @@
       <span>{$_("history.columns.date")}</span>
     </div>
 
-    {#if repository && historyCommits.length > 0}
+    {#if repository && filteredHistoryCommits.length > 0}
       <ul bind:this={historyRowsElement} class="history-rows">
         {#each historyGraphRows as commit}
           <li class:history-row-selected={selectedCommitOid === commit.oid} class:muted-history-row={!commit.on_current_branch}>
@@ -407,10 +429,15 @@
           </li>
         {/each}
       </ul>
-    {:else if repository && historyLoading}
+    {:else if repository && historyLoading && historyCommits.length === 0}
       <div class="empty-history">
         <p>{$_("history.loadingTitle")}</p>
         <p class="muted">{$_("history.loadingBody")}</p>
+      </div>
+    {:else if repository && historyCommits.length > 0}
+      <div class="empty-history">
+        <p>{$_("history.filteredEmptyTitle")}</p>
+        <p class="muted">{$_("history.filteredEmptyBody")}</p>
       </div>
     {:else}
       <div class="empty-history">

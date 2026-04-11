@@ -108,6 +108,8 @@
     "loadingBody": "読み込みが進むにつれて一覧が更新されます。",
     "emptyTitle": "表示できるコミット履歴がありません。",
     "emptyBody": "リポジトリを開くか、最初のコミットを作成してください。",
+    "filteredEmptyTitle": "検索条件に一致するコミットがありません。",
+    "filteredEmptyBody": "別のキーワードにするか、検索ボックスをクリアしてください。",
     "details": {
       "loadingTitle": "コミット詳細を読み込み中です。",
       "loadingBody": "メタ情報と差分を読み込んでいます。",
