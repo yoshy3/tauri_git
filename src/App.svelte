@@ -66,6 +66,8 @@
       head_summary: status.head_summary ?? null,
       history_revision: status.history_revision ?? "",
       has_origin_remote: status.has_origin_remote,
+      ahead_count: status.ahead_count ?? 0,
+      behind_count: status.behind_count ?? 0,
       is_clean: status.is_clean,
       entries: status.entries ?? [],
       local_branches: status.local_branches ?? [],

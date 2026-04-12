@@ -17,6 +17,22 @@
   function iconType(action) {
     return action.toLowerCase();
   }
+
+  function actionBadgeCount(action) {
+    if (!repository) {
+      return 0;
+    }
+
+    if (action === "Pull") {
+      return repository.behind_count ?? 0;
+    }
+
+    if (action === "Push") {
+      return repository.ahead_count ?? 0;
+    }
+
+    return 0;
+  }
 </script>
 
 <header class="topbar">
@@ -31,59 +47,69 @@
   <div class="toolbar-cluster">
     <div class="toolbar">
       {#each topActions as action}
+        {@const badgeCount = actionBadgeCount(action)}
         <button
           class:active={activeAction === action}
           class="toolbar-button"
           disabled={!repository || loading || !implementedActions.includes(action)}
           on:click={() => onAction(action)}
         >
-          <span class="button-icon" aria-hidden="true">
-            {#if iconType(action) === "fetch"}
-              <svg viewBox="0 0 16 16" fill="none">
-                <path d="M8 2.5v8" />
-                <path d="M5.25 7.75 8 10.5l2.75-2.75" />
-                <path d="M3 12.5h10" />
-              </svg>
-            {:else if iconType(action) === "pull"}
-              <svg viewBox="0 0 16 16" fill="none">
-                <path d="M8 2.5v8" />
-                <path d="M5.25 7.75 8 10.5l2.75-2.75" />
-                <path d="M4 5.25a4 4 0 0 1 8 0" />
-              </svg>
-            {:else if iconType(action) === "push"}
-              <svg viewBox="0 0 16 16" fill="none">
-                <path d="M8 13.5v-8" />
-                <path d="M10.75 8.25 8 5.5 5.25 8.25" />
-                <path d="M4 10.75a4 4 0 0 0 8 0" />
-              </svg>
-            {:else if iconType(action) === "stash"}
-              <svg viewBox="0 0 16 16" fill="none">
-                <path d="M3 5.25 8 2.5l5 2.75-5 2.75-5-2.75Z" />
-                <path d="M3 8.25 8 11l5-2.75" />
-                <path d="M3 11.25 8 14l5-2.75" />
-              </svg>
-            {:else if iconType(action) === "discard"}
-              <svg viewBox="0 0 16 16" fill="none">
-                <path d="M3.75 4.5h8.5" />
-                <path d="M6.25 2.75h3.5" />
-                <path d="M5 4.5v7.25" />
-                <path d="M8 4.5v7.25" />
-                <path d="M11 4.5v7.25" />
-                <path d="M4.5 4.5l.6 8.1c.04.5.45.9.95.9h3.9c.5 0 .91-.4.95-.9l.6-8.1" />
-              </svg>
+          <span class="button-icon-wrap">
+            <span class="button-icon" aria-hidden="true">
+              {#if iconType(action) === "fetch"}
+                <svg class="toolbar-svg toolbar-svg-fetch" viewBox="0 0 16 16" fill="none">
+                  <path d="M8 2.5v8" />
+                  <path d="M5.25 7.75 8 10.5l2.75-2.75" />
+                  <path d="M3 12.5h10" />
+                </svg>
+              {:else if iconType(action) === "pull"}
+                <svg class="toolbar-svg toolbar-svg-pull" viewBox="0 0 16 16" fill="none">
+                  <path d="M8 2.5v8" />
+                  <path d="M5.25 7.75 8 10.5l2.75-2.75" />
+                  <path d="M4 5.25a4 4 0 0 1 8 0" />
+                </svg>
+              {:else if iconType(action) === "push"}
+                <svg class="toolbar-svg toolbar-svg-push" viewBox="0 0 16 16" fill="none">
+                  <path d="M8 13.5v-8" />
+                  <path d="M10.75 8.25 8 5.5 5.25 8.25" />
+                  <path d="M4 10.75a4 4 0 0 0 8 0" />
+                </svg>
+              {:else if iconType(action) === "stash"}
+                <svg class="toolbar-svg toolbar-svg-stash" viewBox="0 0 16 16" fill="none">
+                  <path d="M3 5.25 8 2.5l5 2.75-5 2.75-5-2.75Z" />
+                  <path d="M3 8.25 8 11l5-2.75" />
+                  <path d="M3 11.25 8 14l5-2.75" />
+                </svg>
+              {:else if iconType(action) === "discard"}
+                <svg class="toolbar-svg toolbar-svg-discard" viewBox="0 0 16 16" fill="none">
+                  <path d="M3.75 4.5h8.5" />
+                  <path d="M6.25 2.75h3.5" />
+                  <path d="M5 4.5v7.25" />
+                  <path d="M8 4.5v7.25" />
+                  <path d="M11 4.5v7.25" />
+                  <path d="M4.5 4.5l.6 8.1c.04.5.45.9.95.9h3.9c.5 0 .91-.4.95-.9l.6-8.1" />
+                </svg>
+              {/if}
+            </span>
+            {#if badgeCount > 0}
+              <span class="toolbar-badge" aria-label={`${action} ${badgeCount} commits pending`}>
+                {badgeCount}
+              </span>
             {/if}
           </span>
-          {activeAction === action ? $_("topbar.syncing") : $_(actionKey(action))}
+          <span class="button-label">{activeAction === action ? $_("topbar.syncing") : $_(actionKey(action))}</span>
         </button>
       {/each}
       <button class:active={activeAction === "Refresh"} class="toolbar-button" on:click={onRefresh} disabled={!repository || loading}>
-        <span class="button-icon" aria-hidden="true">
-          <svg viewBox="0 0 16 16" fill="none">
-            <path d="M12.75 6A5 5 0 1 0 13 8" />
-            <path d="M10.75 3.25h2v2" />
-          </svg>
+        <span class="button-icon-wrap">
+          <span class="button-icon" aria-hidden="true">
+            <svg class="toolbar-svg toolbar-svg-refresh" viewBox="0 0 16 16" fill="none">
+              <path d="M12.75 6A5 5 0 1 0 13 8" />
+              <path d="M10.75 3.25h2v2" />
+            </svg>
+          </span>
         </span>
-        {activeAction === "Refresh" ? $_("topbar.syncing") : $_("topbar.refresh")}
+        <span class="button-label">{activeAction === "Refresh" ? $_("topbar.syncing") : $_("topbar.refresh")}</span>
       </button>
     </div>
 
@@ -171,19 +197,24 @@
     display: flex;
     gap: 2px;
     flex-wrap: wrap;
+    align-items: stretch;
   }
 
   .toolbar-button {
     display: inline-flex;
+    flex-direction: column;
     align-items: center;
-    gap: 8px;
+    justify-content: flex-start;
+    gap: 7px;
     background: transparent;
     border: 0;
     color: #8aa0b8;
     text-transform: uppercase;
     letter-spacing: 0.08em;
     font-size: 0.72rem;
-    padding: 10px 12px;
+    min-width: 66px;
+    min-height: 64px;
+    padding: 7px 10px 10px;
     border-radius: 8px;
   }
 
@@ -248,21 +279,85 @@
   }
 
   .button-icon {
-    width: 14px;
-    height: 14px;
+    width: 22px;
+    height: 22px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
   }
 
-  .button-icon svg {
-    width: 14px;
-    height: 14px;
+  .button-icon-wrap {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    flex-shrink: 0;
+  }
+
+  .button-label {
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    min-height: 1.2em;
+    line-height: 1.1;
+    text-align: center;
+  }
+
+  .toolbar-svg {
+    width: 22px;
+    height: 22px;
     stroke: currentColor;
     stroke-width: 1.6;
     stroke-linecap: round;
     stroke-linejoin: round;
+  }
+
+  .toolbar-svg-fetch {
+    transform: translateY(1px);
+  }
+
+  .toolbar-svg-pull {
+    transform: translateY(3.5px);
+  }
+
+  .toolbar-svg-push {
+    transform: translateY(-1.5px);
+  }
+
+  .toolbar-svg-stash {
+    transform: translateY(0.5px);
+  }
+
+  .toolbar-svg-discard {
+    transform: translateY(0.5px);
+  }
+
+  .toolbar-svg-refresh {
+    transform: translateY(0.5px);
+  }
+
+  .toolbar-badge {
+    position: absolute;
+    top: -1px;
+    right: -9px;
+    min-width: 14px;
+    height: 14px;
+    padding: 0 2px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    background: #e5484d;
+    color: #fff8f8;
+    font-size: 0.5rem;
+    font-weight: 800;
+    line-height: 1;
+    letter-spacing: 0;
+    box-shadow: 0 0 0 2px rgba(8, 17, 27, 0.92);
+    pointer-events: none;
   }
 
   .locale-glyph {

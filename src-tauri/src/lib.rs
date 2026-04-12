@@ -38,6 +38,8 @@ struct GitStatusResponse {
     head_oid: Option<String>,
     history_revision: String,
     has_origin_remote: bool,
+    ahead_count: usize,
+    behind_count: usize,
     is_clean: bool,
     entries: Vec<GitStatusEntry>,
     head_summary: Option<String>,
@@ -313,7 +315,10 @@ async fn pop_stash(path: String, index: Option<usize>) -> Result<GitStatusRespon
 }
 
 #[tauri::command]
-async fn get_worktree_file_diff(path: String, file_path: String) -> Result<GitWorktreeFileDiff, String> {
+async fn get_worktree_file_diff(
+    path: String,
+    file_path: String,
+) -> Result<GitWorktreeFileDiff, String> {
     run_blocking(move || {
         let repository = open_repo(&path)?;
         load_worktree_file_diff(&repository, &file_path)
@@ -433,6 +438,7 @@ fn build_repository_status(repository: &mut Repository) -> Result<GitStatusRespo
         .and_then(|head| head.target())
         .map(|oid| oid.to_string());
     let history_revision = build_history_revision(repository)?;
+    let (ahead_count, behind_count) = load_upstream_sync_counts(repository)?;
 
     let local_branches = load_local_branches(repository)?;
     let remote_groups = load_remote_groups(repository)?;
@@ -448,6 +454,8 @@ fn build_repository_status(repository: &mut Repository) -> Result<GitStatusRespo
         head_oid,
         history_revision,
         has_origin_remote,
+        ahead_count,
+        behind_count,
         is_clean: entries.is_empty(),
         entries,
         head_summary,
@@ -457,6 +465,48 @@ fn build_repository_status(repository: &mut Repository) -> Result<GitStatusRespo
         stashes,
         submodules,
     })
+}
+
+fn load_upstream_sync_counts(repository: &Repository) -> Result<(usize, usize), String> {
+    let head = match repository.head() {
+        Ok(head) => head,
+        Err(_) => return Ok((0, 0)),
+    };
+
+    if !head.is_branch() {
+        return Ok((0, 0));
+    }
+
+    let Some(branch_name) = head.shorthand() else {
+        return Ok((0, 0));
+    };
+
+    let branch = repository
+        .find_branch(branch_name, git2::BranchType::Local)
+        .map_err(|error| format!("現在のブランチを取得できませんでした: {}", error.message()))?;
+
+    let upstream = match branch.upstream() {
+        Ok(upstream) => upstream,
+        Err(_) => return Ok((0, 0)),
+    };
+
+    let local_oid = match branch.get().target() {
+        Some(oid) => oid,
+        None => return Ok((0, 0)),
+    };
+    let upstream_oid = match upstream.get().target() {
+        Some(oid) => oid,
+        None => return Ok((0, 0)),
+    };
+
+    repository
+        .graph_ahead_behind(local_oid, upstream_oid)
+        .map_err(|error| {
+            format!(
+                "upstream との差分を取得できませんでした: {}",
+                error.message()
+            )
+        })
 }
 
 fn create_commit(repository: &Repository, message: &str) -> Result<(), String> {
@@ -501,7 +551,14 @@ fn create_commit(repository: &Repository, message: &str) -> Result<(), String> {
     let parents: Vec<&git2::Commit<'_>> = parent_commit.iter().collect();
 
     repository
-        .commit(Some("HEAD"), &signature, &signature, message.trim(), &tree, &parents)
+        .commit(
+            Some("HEAD"),
+            &signature,
+            &signature,
+            message.trim(),
+            &tree,
+            &parents,
+        )
         .map_err(|error| format!("コミットに失敗しました: {}", error.message()))?;
 
     repository
@@ -703,7 +760,7 @@ fn create_branch_from_source(
     command.current_dir(repo_root);
 
     if switch_after_create {
-      if source_kind == "remote_branch" {
+        if source_kind == "remote_branch" {
             command
                 .arg("checkout")
                 .arg("-b")
@@ -724,10 +781,7 @@ fn create_branch_from_source(
             .arg(branch_name)
             .arg(&source_ref);
     } else {
-        command
-            .arg("branch")
-            .arg(branch_name)
-            .arg(&source_ref);
+        command.arg("branch").arg(branch_name).arg(&source_ref);
     }
 
     let output = command
@@ -884,7 +938,10 @@ fn create_stash(
     Ok(())
 }
 
-fn discard_selected_changes(repository: &Repository, selected_paths: &[String]) -> Result<(), String> {
+fn discard_selected_changes(
+    repository: &Repository,
+    selected_paths: &[String],
+) -> Result<(), String> {
     if selected_paths.is_empty() {
         return Err("discard する変更がありません。".to_string());
     }
@@ -966,7 +1023,11 @@ fn discard_selected_changes(repository: &Repository, selected_paths: &[String]) 
 
         if !tracked_removals.is_empty() {
             let mut command = git_command();
-            command.current_dir(&repo_root).arg("rm").arg("-f").arg("--");
+            command
+                .current_dir(&repo_root)
+                .arg("rm")
+                .arg("-f")
+                .arg("--");
 
             for path in &tracked_removals {
                 command.arg(path);
@@ -977,7 +1038,11 @@ fn discard_selected_changes(repository: &Repository, selected_paths: &[String]) 
 
         if !untracked_removals.is_empty() {
             let mut command = git_command();
-            command.current_dir(&repo_root).arg("clean").arg("-fd").arg("--");
+            command
+                .current_dir(&repo_root)
+                .arg("clean")
+                .arg("-fd")
+                .arg("--");
 
             for path in &untracked_removals {
                 command.arg(path);
@@ -1023,18 +1088,21 @@ fn reset_index_to_head(repository: &Repository) -> Result<(), String> {
 
     if let Ok(head) = repository.head() {
         if let Ok(tree) = head.peel_to_tree() {
-            index
-                .read_tree(&tree)
-                .map_err(|error| format!("インデックスを HEAD に戻せませんでした: {}", error.message()))?;
+            index.read_tree(&tree).map_err(|error| {
+                format!(
+                    "インデックスを HEAD に戻せませんでした: {}",
+                    error.message()
+                )
+            })?;
         } else {
-            index
-                .clear()
-                .map_err(|error| format!("インデックスを初期化できませんでした: {}", error.message()))?;
+            index.clear().map_err(|error| {
+                format!("インデックスを初期化できませんでした: {}", error.message())
+            })?;
         }
     } else {
-        index
-            .clear()
-            .map_err(|error| format!("インデックスを初期化できませんでした: {}", error.message()))?;
+        index.clear().map_err(|error| {
+            format!("インデックスを初期化できませんでした: {}", error.message())
+        })?;
     }
 
     index
@@ -1169,7 +1237,10 @@ impl RepositoryHeadExt for Repository {
         match tree.get_path(std::path::Path::new(path)) {
             Ok(_) => Ok(true),
             Err(error) if error.code() == git2::ErrorCode::NotFound => Ok(false),
-            Err(error) => Err(format!("HEAD のファイル状態を確認できませんでした: {}", error.message())),
+            Err(error) => Err(format!(
+                "HEAD のファイル状態を確認できませんでした: {}",
+                error.message()
+            )),
         }
     }
 }
@@ -1191,13 +1262,16 @@ fn build_history_revision(repository: &Repository) -> Result<String, String> {
         }
     }
 
-    let references = repository
-        .references()
-        .map_err(|error| format!("履歴リビジョン情報を取得できませんでした: {}", error.message()))?;
+    let references = repository.references().map_err(|error| {
+        format!(
+            "履歴リビジョン情報を取得できませんでした: {}",
+            error.message()
+        )
+    })?;
 
     for reference_result in references {
-        let reference =
-            reference_result.map_err(|error| format!("参照情報を読み込めませんでした: {}", error.message()))?;
+        let reference = reference_result
+            .map_err(|error| format!("参照情報を読み込めませんでした: {}", error.message()))?;
         let Some(name) = reference.name() else {
             continue;
         };
@@ -1229,9 +1303,12 @@ fn tree_is_unchanged(
         return Ok(new_tree.is_empty());
     };
 
-    let parent_tree = parent_commit
-        .tree()
-        .map_err(|error| format!("親コミットのツリーを取得できませんでした: {}", error.message()))?;
+    let parent_tree = parent_commit.tree().map_err(|error| {
+        format!(
+            "親コミットのツリーを取得できませんでした: {}",
+            error.message()
+        )
+    })?;
 
     Ok(parent_tree.id() == new_tree.id())
 }
@@ -1284,7 +1361,8 @@ fn load_commit_history_chunk(
         .map_err(|error| format!("コミット履歴を読み込めませんでした: {}", error.message()))?;
 
     push_history_refs(repository, &mut revwalk)?;
-    revwalk.set_sorting(git2::Sort::TOPOLOGICAL)
+    revwalk
+        .set_sorting(git2::Sort::TOPOLOGICAL)
         .map_err(|error| format!("コミット履歴の並び替えに失敗しました: {}", error.message()))?;
 
     let mut commits = Vec::new();
@@ -1310,9 +1388,17 @@ fn load_commit_history_chunk(
         let committed_at = chrono::DateTime::from_timestamp(timestamp, 0)
             .map(|datetime| datetime.format("%Y-%m-%dT%H:%M:%S").to_string())
             .unwrap_or_else(|| "unknown time".to_string());
-        let parent_ids = commit.parent_ids().map(|parent_id| parent_id.to_string()).collect();
+        let parent_ids = commit
+            .parent_ids()
+            .map(|parent_id| parent_id.to_string())
+            .collect();
         let on_current_branch = current_head_oid
-            .map(|head_oid| head_oid == oid || repository.graph_descendant_of(head_oid, oid).unwrap_or(false))
+            .map(|head_oid| {
+                head_oid == oid
+                    || repository
+                        .graph_descendant_of(head_oid, oid)
+                        .unwrap_or(false)
+            })
             .unwrap_or(false);
 
         commits.push(GitCommitSummary {
@@ -1323,7 +1409,10 @@ fn load_commit_history_chunk(
             committed_at,
             parent_ids,
             on_current_branch,
-            labels: reference_labels.get(&oid.to_string()).cloned().unwrap_or_default(),
+            labels: reference_labels
+                .get(&oid.to_string())
+                .cloned()
+                .unwrap_or_default(),
         });
     }
 
@@ -1336,7 +1425,8 @@ fn load_commit_detail(repository: &Repository, oid: &str) -> Result<GitCommitDet
         .ok()
         .and_then(|head| head.shorthand().map(ToOwned::to_owned));
     let reference_labels = load_reference_labels(repository, current_branch_name.as_deref())?;
-    let oid = Oid::from_str(oid).map_err(|error| format!("コミット ID が不正です: {}", error.message()))?;
+    let oid = Oid::from_str(oid)
+        .map_err(|error| format!("コミット ID が不正です: {}", error.message()))?;
     let commit = repository
         .find_commit(oid)
         .map_err(|error| format!("コミットを読み込めませんでした: {}", error.message()))?;
@@ -1401,7 +1491,12 @@ fn load_commit_file_diffs(
             commit
                 .parent(0)
                 .and_then(|parent| parent.tree())
-                .map_err(|error| format!("親コミットのツリーを取得できませんでした: {}", error.message()))?,
+                .map_err(|error| {
+                    format!(
+                        "親コミットのツリーを取得できませんでした: {}",
+                        error.message()
+                    )
+                })?,
         )
     } else {
         None
@@ -1563,8 +1658,13 @@ fn append_reference_labels(
     };
 
     for reference_result in references {
-        let reference = reference_result
-            .map_err(|error| format!("参照 {} の読み込みに失敗しました: {}", pattern, error.message()))?;
+        let reference = reference_result.map_err(|error| {
+            format!(
+                "参照 {} の読み込みに失敗しました: {}",
+                pattern,
+                error.message()
+            )
+        })?;
         let Ok(commit) = reference.peel_to_commit() else {
             continue;
         };
@@ -1625,13 +1725,18 @@ fn push_history_refs(
 
         if let Some(references) = references {
             for reference_result in references {
-                let reference = reference_result
-                    .map_err(|error| format!("タグ参照の読み込みに失敗しました: {}", error.message()))?;
+                let reference = reference_result.map_err(|error| {
+                    format!("タグ参照の読み込みに失敗しました: {}", error.message())
+                })?;
                 let Ok(commit) = reference.peel_to_commit() else {
                     continue;
                 };
                 revwalk.push(commit.id()).map_err(|error| {
-                    format!("タグ {} を履歴起点に追加できませんでした: {}", commit.id(), error.message())
+                    format!(
+                        "タグ {} を履歴起点に追加できませんでした: {}",
+                        commit.id(),
+                        error.message()
+                    )
                 })?;
                 pushed_any = true;
             }
@@ -1655,8 +1760,8 @@ fn load_local_branches(repository: &Repository) -> Result<Vec<String>, String> {
     let mut names = Vec::new();
 
     for branch_result in branches {
-        let (branch, _) =
-            branch_result.map_err(|error| format!("ブランチ情報を読み込めませんでした: {}", error.message()))?;
+        let (branch, _) = branch_result
+            .map_err(|error| format!("ブランチ情報を読み込めませんでした: {}", error.message()))?;
         if let Some(name) = branch
             .name()
             .map_err(|error| format!("ブランチ名を取得できませんでした: {}", error.message()))?
@@ -1672,16 +1777,28 @@ fn load_local_branches(repository: &Repository) -> Result<Vec<String>, String> {
 fn load_remote_groups(repository: &Repository) -> Result<Vec<GitRemoteGroup>, String> {
     let branches = repository
         .branches(Some(git2::BranchType::Remote))
-        .map_err(|error| format!("リモートブランチ一覧を取得できませんでした: {}", error.message()))?;
+        .map_err(|error| {
+            format!(
+                "リモートブランチ一覧を取得できませんでした: {}",
+                error.message()
+            )
+        })?;
 
     let mut grouped = BTreeMap::<String, Vec<String>>::new();
 
     for branch_result in branches {
-        let (branch, _) = branch_result
-            .map_err(|error| format!("リモートブランチ情報を読み込めませんでした: {}", error.message()))?;
-        let Some(name) = branch
-            .name()
-            .map_err(|error| format!("リモートブランチ名を取得できませんでした: {}", error.message()))?
+        let (branch, _) = branch_result.map_err(|error| {
+            format!(
+                "リモートブランチ情報を読み込めませんでした: {}",
+                error.message()
+            )
+        })?;
+        let Some(name) = branch.name().map_err(|error| {
+            format!(
+                "リモートブランチ名を取得できませんでした: {}",
+                error.message()
+            )
+        })?
         else {
             continue;
         };
@@ -1729,14 +1846,14 @@ fn load_stashes(repository: &mut Repository) -> Result<Vec<GitStashEntry>, Strin
     let mut stashes = Vec::new();
 
     match repository.stash_foreach(|index, message, _oid| {
-            let (name, detail) = parse_stash_display(message, index);
-            stashes.push(GitStashEntry {
-                index,
-                name,
-                message: detail,
-            });
-            true
-        }) {
+        let (name, detail) = parse_stash_display(message, index);
+        stashes.push(GitStashEntry {
+            index,
+            name,
+            message: detail,
+        });
+        true
+    }) {
         Ok(()) => {}
         Err(error) if error.code() == git2::ErrorCode::NotFound => {}
         Err(error) => {
@@ -1789,14 +1906,27 @@ fn load_submodules(repository: &Repository) -> Result<Vec<GitSubmoduleEntry>, St
     Ok(entries)
 }
 
-fn resolve_tag_target_oid(repository: &Repository, tag_name: &str) -> Result<GitReferenceTarget, String> {
+fn resolve_tag_target_oid(
+    repository: &Repository,
+    tag_name: &str,
+) -> Result<GitReferenceTarget, String> {
     let reference_name = format!("refs/tags/{tag_name}");
     let reference = repository
         .find_reference(&reference_name)
-        .map_err(|error| format!("タグ {} を読み込めませんでした: {}", tag_name, error.message()))?;
-    let commit = reference
-        .peel_to_commit()
-        .map_err(|error| format!("タグ {} のコミットを解決できませんでした: {}", tag_name, error.message()))?;
+        .map_err(|error| {
+            format!(
+                "タグ {} を読み込めませんでした: {}",
+                tag_name,
+                error.message()
+            )
+        })?;
+    let commit = reference.peel_to_commit().map_err(|error| {
+        format!(
+            "タグ {} のコミットを解決できませんでした: {}",
+            tag_name,
+            error.message()
+        )
+    })?;
 
     Ok(GitReferenceTarget {
         oid: commit.id().to_string(),
