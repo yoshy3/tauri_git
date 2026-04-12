@@ -40,6 +40,24 @@
     };
   }
 
+  function hasSyncCounts(node) {
+    return (node.behindCount ?? 0) > 0 || (node.aheadCount ?? 0) > 0;
+  }
+
+  function syncLabel(node) {
+    const parts = [];
+
+    if ((node.behindCount ?? 0) > 0) {
+      parts.push(`Pull ${node.behindCount}`);
+    }
+
+    if ((node.aheadCount ?? 0) > 0) {
+      parts.push(`Push ${node.aheadCount}`);
+    }
+
+    return parts.join(", ");
+  }
+
   function openMenu(node) {
     if (loading || !node.isBranch) {
       return;
@@ -73,6 +91,16 @@
           <div class="tree-item-copy">
             <span class="tree-item-icon tree-item-branch"></span>
             <span class="tree-item-label">{node.label}</span>
+            {#if hasSyncCounts(node)}
+              <span class="tree-item-sync" aria-label={syncLabel(node)}>
+                {#if (node.behindCount ?? 0) > 0}
+                  <span class="tree-item-sync-count">{node.behindCount}<span class="tree-item-sync-arrow">↓</span></span>
+                {/if}
+                {#if (node.aheadCount ?? 0) > 0}
+                  <span class="tree-item-sync-count">{node.aheadCount}<span class="tree-item-sync-arrow">↑</span></span>
+                {/if}
+              </span>
+            {/if}
           </div>
 
           <div class:menu-open={menuOpenKey === nodeMenuKey(node)} class="tree-item-actions">
@@ -169,10 +197,34 @@
   .tree-item-copy {
     min-width: 0;
     display: grid;
-    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-columns: auto minmax(0, 1fr) auto;
     gap: 8px;
     align-items: center;
     padding: 0 4px 0 0;
+  }
+
+  .tree-item-sync {
+    display: inline-flex;
+    align-items: center;
+    justify-self: end;
+    gap: 6px;
+    color: #8fbaf0;
+    font-size: 0.73rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.01em;
+    white-space: nowrap;
+  }
+
+  .tree-item-sync-count {
+    display: inline-flex;
+    align-items: center;
+    gap: 1px;
+  }
+
+  .tree-item-sync-arrow {
+    font-size: 0.82em;
+    line-height: 1;
   }
 
   .tree-item-row:hover,
@@ -186,6 +238,10 @@
     color: #eef7ff;
     font-weight: 700;
     box-shadow: inset 0 0 0 1px rgba(108, 177, 248, 0.28);
+  }
+
+  .tree-item-row.tree-item-current .tree-item-sync {
+    color: #eef7ff;
   }
 
   .tree-item-actions {

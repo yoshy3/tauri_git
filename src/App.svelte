@@ -71,6 +71,7 @@
       is_clean: status.is_clean,
       entries: status.entries ?? [],
       local_branches: status.local_branches ?? [],
+      local_branch_syncs: status.local_branch_syncs ?? [],
       remote_groups: status.remote_groups ?? [],
       tags: status.tags ?? [],
       stashes: status.stashes ?? [],

@@ -44,6 +44,7 @@ struct GitStatusResponse {
     entries: Vec<GitStatusEntry>,
     head_summary: Option<String>,
     local_branches: Vec<String>,
+    local_branch_syncs: Vec<GitLocalBranchSync>,
     remote_groups: Vec<GitRemoteGroup>,
     tags: Vec<String>,
     stashes: Vec<GitStashEntry>,
@@ -54,6 +55,13 @@ struct GitStatusResponse {
 struct GitRemoteGroup {
     name: String,
     branches: Vec<String>,
+}
+
+#[derive(Serialize)]
+struct GitLocalBranchSync {
+    name: String,
+    ahead_count: usize,
+    behind_count: usize,
 }
 
 #[derive(Serialize)]
@@ -438,9 +446,16 @@ fn build_repository_status(repository: &mut Repository) -> Result<GitStatusRespo
         .and_then(|head| head.target())
         .map(|oid| oid.to_string());
     let history_revision = build_history_revision(repository)?;
-    let (ahead_count, behind_count) = load_upstream_sync_counts(repository)?;
-
-    let local_branches = load_local_branches(repository)?;
+    let local_branch_syncs = load_local_branch_syncs(repository)?;
+    let (ahead_count, behind_count) = local_branch_syncs
+        .iter()
+        .find(|entry| entry.name == branch)
+        .map(|entry| (entry.ahead_count, entry.behind_count))
+        .unwrap_or((0, 0));
+    let local_branches = local_branch_syncs
+        .iter()
+        .map(|entry| entry.name.clone())
+        .collect();
     let remote_groups = load_remote_groups(repository)?;
     let tags = load_tags(repository)?;
     let stashes = load_stashes(repository)?;
@@ -460,6 +475,7 @@ fn build_repository_status(repository: &mut Repository) -> Result<GitStatusRespo
         entries,
         head_summary,
         local_branches,
+        local_branch_syncs,
         remote_groups,
         tags,
         stashes,
@@ -467,24 +483,10 @@ fn build_repository_status(repository: &mut Repository) -> Result<GitStatusRespo
     })
 }
 
-fn load_upstream_sync_counts(repository: &Repository) -> Result<(usize, usize), String> {
-    let head = match repository.head() {
-        Ok(head) => head,
-        Err(_) => return Ok((0, 0)),
-    };
-
-    if !head.is_branch() {
-        return Ok((0, 0));
-    }
-
-    let Some(branch_name) = head.shorthand() else {
-        return Ok((0, 0));
-    };
-
-    let branch = repository
-        .find_branch(branch_name, git2::BranchType::Local)
-        .map_err(|error| format!("現在のブランチを取得できませんでした: {}", error.message()))?;
-
+fn load_branch_upstream_sync_counts(
+    repository: &Repository,
+    branch: &git2::Branch<'_>,
+) -> Result<(usize, usize), String> {
     let upstream = match branch.upstream() {
         Ok(upstream) => upstream,
         Err(_) => return Ok((0, 0)),
@@ -1752,12 +1754,12 @@ fn push_history_refs(
     Ok(())
 }
 
-fn load_local_branches(repository: &Repository) -> Result<Vec<String>, String> {
+fn load_local_branch_syncs(repository: &Repository) -> Result<Vec<GitLocalBranchSync>, String> {
     let branches = repository
         .branches(Some(git2::BranchType::Local))
         .map_err(|error| format!("ブランチ一覧を取得できませんでした: {}", error.message()))?;
 
-    let mut names = Vec::new();
+    let mut syncs = Vec::new();
 
     for branch_result in branches {
         let (branch, _) = branch_result
@@ -1766,12 +1768,17 @@ fn load_local_branches(repository: &Repository) -> Result<Vec<String>, String> {
             .name()
             .map_err(|error| format!("ブランチ名を取得できませんでした: {}", error.message()))?
         {
-            names.push(name.to_string());
+            let (ahead_count, behind_count) = load_branch_upstream_sync_counts(repository, &branch)?;
+            syncs.push(GitLocalBranchSync {
+                name: name.to_string(),
+                ahead_count,
+                behind_count,
+            });
         }
     }
 
-    names.sort();
-    Ok(names)
+    syncs.sort_by(|left, right| left.name.cmp(&right.name));
+    Ok(syncs)
 }
 
 fn load_remote_groups(repository: &Repository) -> Result<Vec<GitRemoteGroup>, String> {

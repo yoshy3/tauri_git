@@ -56,7 +56,7 @@
     return String(value || "").toLowerCase().includes(branchFilterTerm);
   }
 
-  function buildBranchTree(branchNames) {
+  function buildBranchTree(branchNames, branchSyncMap = {}) {
     const root = [];
 
     branchNames.forEach((branchName) => {
@@ -82,9 +82,14 @@
             label: segment,
             fullName: pathSoFar,
             isBranch,
+            aheadCount: isBranch ? branchSyncMap[pathSoFar]?.ahead_count ?? 0 : 0,
+            behindCount: isBranch ? branchSyncMap[pathSoFar]?.behind_count ?? 0 : 0,
             children: [],
           };
           level.push(node);
+        } else if (isBranch) {
+          node.aheadCount = branchSyncMap[pathSoFar]?.ahead_count ?? 0;
+          node.behindCount = branchSyncMap[pathSoFar]?.behind_count ?? 0;
         }
 
         level = node.children;
@@ -121,7 +126,10 @@
   }
 
   $: branchFilterTerm = branchFilter.trim().toLowerCase();
-  $: localBranchTree = repository ? buildBranchTree(repository.local_branches) : [];
+  $: localBranchSyncMap = repository
+    ? Object.fromEntries((repository.local_branch_syncs ?? []).map((entry) => [entry.name, entry]))
+    : {};
+  $: localBranchTree = repository ? buildBranchTree(repository.local_branches, localBranchSyncMap) : [];
   $: filteredLocalBranchTree = filterBranchTree(localBranchTree, branchFilterTerm);
   $: filteredRemoteGroups = repository
     ? repository.remote_groups
