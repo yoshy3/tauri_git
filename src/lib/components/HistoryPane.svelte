@@ -9,6 +9,7 @@
   export let historyLoading = false;
   export let historyLoadedAll = false;
   export let selectedCommitOid = "";
+  export let selectedCommitScrollToken = 0;
   export let selectedCommitDetail = null;
   export let selectedCommitDetailLoading = false;
   export let onSelectCommit = () => {};
@@ -300,6 +301,7 @@
   let detailDragStartY = 0;
   let detailDragStartHeight = 0;
   let previousDetailScrollKey = "";
+  let previousSelectedCommitScrollToken = 0;
   $: detailPanelVisible = !!selectedCommitOid;
   $: defaultDetailPanelHeight = clampDetailPanelHeight(Math.round(windowHeight * 0.44));
   $: activeDetailPanelHeight =
@@ -327,6 +329,12 @@
   $: if (detailScrollKey !== previousDetailScrollKey) {
     previousDetailScrollKey = detailScrollKey;
     if (detailPanelVisible) {
+      void tick().then(ensureSelectedCommitVisible);
+    }
+  }
+  $: if (selectedCommitScrollToken !== previousSelectedCommitScrollToken) {
+    previousSelectedCommitScrollToken = selectedCommitScrollToken;
+    if (selectedCommitScrollToken > 0 && selectedCommitOid) {
       void tick().then(ensureSelectedCommitVisible);
     }
   }
@@ -403,6 +411,7 @@
                       <span
                         class:history-tag-local={label.scope === "local"}
                         class:history-tag-remote={label.scope === "remote"}
+                        class:history-tag-ref={label.scope === "tag"}
                         class:history-tag-current={label.is_current}
                       >
                         {label.name}
@@ -505,6 +514,7 @@
                     <span
                       class:history-tag-local={label.scope === "local"}
                       class:history-tag-remote={label.scope === "remote"}
+                      class:history-tag-ref={label.scope === "tag"}
                       class:history-tag-current={label.is_current}
                     >
                       {label.name}
@@ -820,6 +830,21 @@
     background: rgba(60, 74, 94, 0.5);
     color: #d4dde7;
     box-shadow: inset 0 0 0 1px rgba(114, 138, 167, 0.2);
+  }
+
+  .history-tags span.history-tag-ref {
+    padding-inline: 8px 9px;
+    border-radius: 7px;
+    background: rgba(22, 86, 67, 0.2);
+    color: #8ef0cb;
+    box-shadow: inset 0 0 0 1px rgba(78, 204, 163, 0.42);
+    font-weight: 600;
+  }
+
+  .muted-history-row .history-tags span.history-tag-ref {
+    background: rgba(22, 86, 67, 0.12);
+    color: #66b89a;
+    box-shadow: inset 0 0 0 1px rgba(78, 204, 163, 0.2);
   }
 
   .history-tags span.history-tag-current {

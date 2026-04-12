@@ -5,10 +5,12 @@
   export let repository = null;
   export let loading = false;
   export let selectedStashIndex = null;
+  export let selectedRef = null;
   export let stashBusyAction = "";
   export let menuOpenKey = "";
   export let onSelectRepository = () => {};
   export let onSelectStash = () => {};
+  export let onSelectTag = () => {};
   export let onToggleMenu = () => {};
   export let onCheckoutReference = () => {};
   export let onCreateBranchFromReference = () => {};
@@ -283,9 +285,16 @@
           {#if filteredTags.length > 0}
             <ul class="tree-list tree-section-children">
               {#each filteredTags as tagName}
-                <li class="tree-item">
-                  <span class="tree-item-icon tree-item-tag"></span>
-                  <span class="tree-item-label">{tagName}</span>
+                <li>
+                  <button
+                    class:tree-item-current={selectedRef?.kind === "tag" && selectedRef.name === tagName}
+                    class="tree-item tree-item-button"
+                    type="button"
+                    on:click={() => onSelectTag(tagName)}
+                  >
+                    <span class="tree-item-icon tree-item-tag"></span>
+                    <span class="tree-item-label">{tagName}</span>
+                  </button>
                 </li>
               {/each}
             </ul>

@@ -28,6 +28,8 @@
   let historyLoadedAll = false;
   let historyRequestId = 0;
   let selectedCommitOid = "";
+  let selectedCommitScrollToken = 0;
+  let pendingRefCommitOid = "";
   let selectedCommitDetail = null;
   let selectedCommitDetailLoading = false;
   let commitDetailRequestId = 0;
@@ -130,6 +132,8 @@
     repository = null;
     selectedRef = null;
     selectedCommitOid = "";
+    selectedCommitScrollToken = 0;
+    pendingRefCommitOid = "";
     selectedCommitDetail = null;
     selectedCommitDetailLoading = false;
     closeBranchMenu();
@@ -190,6 +194,8 @@
       });
       selectedRef = null;
       selectedCommitOid = "";
+      selectedCommitScrollToken = 0;
+      pendingRefCommitOid = "";
       selectedCommitDetail = null;
       selectedCommitDetailLoading = false;
       closeBranchMenu();
@@ -446,7 +452,50 @@
 
   async function checkoutReference(ref) {
     selectedRef = ref;
+    pendingRefCommitOid = "";
     await checkoutSelectedRef();
+  }
+
+  async function selectTag(tagName) {
+    if (!repository || !tagName) {
+      return;
+    }
+
+    selectedStashIndex = null;
+    closeBranchMenu();
+    selectedRef = {
+      key: `tag:${tagName}`,
+      kind: "tag",
+      name: tagName,
+      displayName: tagName,
+      canCheckout: false,
+      canCreateBranch: true,
+      canDelete: false,
+    };
+    error = "";
+
+    try {
+      const target = await invoke("resolve_tag_target", {
+        path: repository.repo_path,
+        tagName,
+      });
+
+      if (selectedRef?.kind !== "tag" || selectedRef.name !== tagName) {
+        return;
+      }
+
+      pendingRefCommitOid = target.oid;
+      if (historyCommits.some((commit) => commit.oid === target.oid)) {
+        selectCommit(target.oid);
+      } else {
+        selectedCommitScrollToken += 1;
+      }
+    } catch (message) {
+      if (selectedRef?.kind === "tag" && selectedRef.name === tagName) {
+        pendingRefCommitOid = "";
+      }
+      error = String(message);
+    }
   }
 
   async function deleteReference(ref) {
@@ -483,6 +532,7 @@
       });
       if (selectedRef?.key === deleteTargetRef.key) {
         selectedRef = null;
+        pendingRefCommitOid = "";
       }
       resetDeleteDialog();
       void loadCommitHistory(repository.repo_path);
@@ -533,6 +583,7 @@
         switchAfterCreate: branchSwitchAfterCreate,
       });
       selectedRef = null;
+      pendingRefCommitOid = "";
       selectedStashIndex = null;
       resetBranchDialog();
       rightPaneExpanded = false;
@@ -605,6 +656,8 @@
     historyLoadedAll = false;
     if (!preserveSelection) {
       selectedCommitOid = "";
+      selectedCommitScrollToken = 0;
+      pendingRefCommitOid = "";
       selectedCommitDetail = null;
       selectedCommitDetailLoading = false;
     }
@@ -746,10 +799,17 @@
       (selectedRef.kind === "tag" && repository.tags?.includes(selectedRef.name));
     if (!stillExists) {
       selectedRef = null;
+      pendingRefCommitOid = "";
     }
+  }
+  $: if (pendingRefCommitOid && historyCommits.some((commit) => commit.oid === pendingRefCommitOid)) {
+    selectCommit(pendingRefCommitOid);
+    selectedCommitScrollToken += 1;
+    pendingRefCommitOid = "";
   }
   $: if (selectedCommitOid && !historyCommits.some((commit) => commit.oid === selectedCommitOid)) {
     selectedCommitOid = "";
+    selectedCommitScrollToken = 0;
     selectedCommitDetail = null;
     selectedCommitDetailLoading = false;
   }
@@ -784,7 +844,12 @@
   }
 
   function selectCommit(oid) {
-    if (!repository || !oid || selectedCommitOid === oid) {
+    if (!repository || !oid) {
+      return;
+    }
+
+    if (selectedCommitOid === oid) {
+      selectedCommitScrollToken += 1;
       return;
     }
 
@@ -843,6 +908,7 @@
       stashBusyAction={stashBusyAction}
       onSelectRepository={selectRepository}
       onSelectStash={(index) => (selectedStashIndex = index)}
+      onSelectTag={selectTag}
       menuOpenKey={branchMenuOpenKey}
       onToggleMenu={(key) => (branchMenuOpenKey = key)}
       onCheckoutReference={checkoutReference}
@@ -860,6 +926,7 @@
       {historyLoading}
       {historyLoadedAll}
       {selectedCommitOid}
+      {selectedCommitScrollToken}
       {selectedCommitDetail}
       {selectedCommitDetailLoading}
       onSelectCommit={selectCommit}

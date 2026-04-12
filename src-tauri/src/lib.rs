@@ -126,6 +126,11 @@ struct GitCommitFileDiff {
 }
 
 #[derive(Serialize)]
+struct GitReferenceTarget {
+    oid: String,
+}
+
+#[derive(Serialize)]
 struct GitWorktreeFileDiff {
     path: String,
     patch: String,
@@ -334,6 +339,15 @@ async fn get_commit_detail(path: String, oid: String) -> Result<GitCommitDetail,
     run_blocking(move || {
         let repository = open_repo(&path)?;
         load_commit_detail(&repository, &oid)
+    })
+    .await
+}
+
+#[tauri::command]
+async fn resolve_tag_target(path: String, tag_name: String) -> Result<GitReferenceTarget, String> {
+    run_blocking(move || {
+        let repository = open_repo(&path)?;
+        resolve_tag_target_oid(&repository, &tag_name)
     })
     .await
 }
@@ -1506,6 +1520,14 @@ fn load_reference_labels(
         None,
         &mut labels_by_oid,
     )?;
+    append_reference_labels(
+        repository,
+        "refs/tags/*",
+        "refs/tags/",
+        "tag",
+        None,
+        &mut labels_by_oid,
+    )?;
 
     for labels in labels_by_oid.values_mut() {
         labels.sort_by(|left, right| {
@@ -1543,7 +1565,7 @@ fn append_reference_labels(
     for reference_result in references {
         let reference = reference_result
             .map_err(|error| format!("参照 {} の読み込みに失敗しました: {}", pattern, error.message()))?;
-        let Some(oid) = reference.target() else {
+        let Ok(commit) = reference.peel_to_commit() else {
             continue;
         };
         let Some(name) = reference.name() else {
@@ -1557,7 +1579,7 @@ fn append_reference_labels(
         let is_current = scope == "local" && current_branch_name == Some(display_name.as_str());
 
         labels_by_oid
-            .entry(oid.to_string())
+            .entry(commit.id().to_string())
             .or_default()
             .push(GitRefLabel {
                 name: display_name,
@@ -1570,12 +1592,12 @@ fn append_reference_labels(
 }
 
 fn push_history_refs(
-    _repository: &Repository,
+    repository: &Repository,
     revwalk: &mut git2::Revwalk<'_>,
 ) -> Result<(), String> {
     let mut pushed_any = false;
 
-    for pattern in ["refs/heads/*", "refs/remotes/origin/*"] {
+    for pattern in ["refs/heads/*", "refs/remotes/origin/*", "refs/tags/*"] {
         match revwalk.push_glob(pattern) {
             Ok(()) => pushed_any = true,
             Err(error) if error.code() == git2::ErrorCode::NotFound => {}
@@ -1585,6 +1607,33 @@ fn push_history_refs(
                     pattern,
                     error.message()
                 ))
+            }
+        }
+    }
+
+    if !pushed_any {
+        let references = match repository.references_glob("refs/tags/*") {
+            Ok(references) => Some(references),
+            Err(error) if error.code() == git2::ErrorCode::NotFound => None,
+            Err(error) => {
+                return Err(format!(
+                    "タグ参照を読み込めませんでした: {}",
+                    error.message()
+                ))
+            }
+        };
+
+        if let Some(references) = references {
+            for reference_result in references {
+                let reference = reference_result
+                    .map_err(|error| format!("タグ参照の読み込みに失敗しました: {}", error.message()))?;
+                let Ok(commit) = reference.peel_to_commit() else {
+                    continue;
+                };
+                revwalk.push(commit.id()).map_err(|error| {
+                    format!("タグ {} を履歴起点に追加できませんでした: {}", commit.id(), error.message())
+                })?;
+                pushed_any = true;
             }
         }
     }
@@ -1740,6 +1789,20 @@ fn load_submodules(repository: &Repository) -> Result<Vec<GitSubmoduleEntry>, St
     Ok(entries)
 }
 
+fn resolve_tag_target_oid(repository: &Repository, tag_name: &str) -> Result<GitReferenceTarget, String> {
+    let reference_name = format!("refs/tags/{tag_name}");
+    let reference = repository
+        .find_reference(&reference_name)
+        .map_err(|error| format!("タグ {} を読み込めませんでした: {}", tag_name, error.message()))?;
+    let commit = reference
+        .peel_to_commit()
+        .map_err(|error| format!("タグ {} のコミットを解決できませんでした: {}", tag_name, error.message()))?;
+
+    Ok(GitReferenceTarget {
+        oid: commit.id().to_string(),
+    })
+}
+
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
@@ -1766,7 +1829,8 @@ pub fn run() {
             pop_stash,
             get_worktree_file_diff,
             get_commit_history_chunk,
-            get_commit_detail
+            get_commit_detail,
+            resolve_tag_target
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

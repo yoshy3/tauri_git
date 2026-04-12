@@ -15,6 +15,7 @@ Tauri Git is a desktop Git client focused on a compact workflow:
 - Create and apply stashes
 - Fetch, pull, and push
 - Browse branches and remotes in a tree view
+- Browse tags and jump from a tag to its commit in history
 - Checkout, create, and delete branches
 
 ## Tech Stack
@@ -29,9 +30,10 @@ Tauri Git is a desktop Git client focused on a compact workflow:
 - Repository picker and last-opened repository restore
 - Auto-refresh when repository files or refs change
 - Working tree status list
-- Commit history with labels for local and remote refs
+- Commit history with labels for local, remote, and tag refs
 - Commit history search and filtering
 - Branch search and filtering in the sidebar
+- Tag selection in the sidebar with commit selection and scroll-to in history
 - Commit detail panel with author / committer / refs / parents / changed files
 - Side-by-side diff dialog from commit details
 - Side-by-side diff dialog from the changes panel
