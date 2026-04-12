@@ -11,6 +11,10 @@
   export let onCreateBranchFromReference = () => {};
   export let onDeleteReference = () => {};
 
+  function nodeMenuKey(node) {
+    return remoteName ? `remote:${remoteName}:${node.key}` : `local:${node.key}`;
+  }
+
   function isCurrentBranch(node) {
     if (!node.isBranch) {
       return false;
@@ -25,7 +29,7 @@
 
   function branchRef(node) {
     return {
-      key: node.key,
+      key: nodeMenuKey(node),
       kind: remoteName ? "remote_branch" : "local_branch",
       name: node.fullName,
       remoteName,
@@ -41,7 +45,8 @@
       return;
     }
 
-    onToggleMenu(menuOpenKey === node.key ? "" : node.key);
+    const key = nodeMenuKey(node);
+    onToggleMenu(menuOpenKey === key ? "" : key);
   }
 
   function checkout(node) {
@@ -70,7 +75,7 @@
             <span class="tree-item-label">{node.label}</span>
           </div>
 
-          <div class:menu-open={menuOpenKey === node.key} class="tree-item-actions">
+          <div class:menu-open={menuOpenKey === nodeMenuKey(node)} class="tree-item-actions">
             <button
               class="tree-item-kebab"
               type="button"
@@ -83,7 +88,7 @@
               <span></span>
             </button>
 
-            {#if menuOpenKey === node.key}
+            {#if menuOpenKey === nodeMenuKey(node)}
               <div class="tree-item-menu">
                 <button class="tree-item-menu-button" type="button" on:click={() => checkout(node)} disabled={loading}>
                   {$_("sidebar.checkout")}
