@@ -446,7 +446,7 @@
             <button
               class="primary wide secondary-primary"
               on:click={handleCommitAndPush}
-              disabled={!repository || committing || commitAndPushing || repository.is_clean || !repository.has_origin_remote}
+              disabled={!repository || committing || commitAndPushing || repository.is_clean || !repository.can_push_current_branch}
             >
               {commitAndPushing
                 ? $_("commit.commitAndPushing")

@@ -38,6 +38,8 @@ struct GitStatusResponse {
     head_oid: Option<String>,
     history_revision: String,
     has_origin_remote: bool,
+    can_push_current_branch: bool,
+    current_branch_upstream_name: Option<String>,
     ahead_count: usize,
     behind_count: usize,
     is_clean: bool,
@@ -87,6 +89,12 @@ struct GitCommitSummary {
     parent_ids: Vec<String>,
     on_current_branch: bool,
     labels: Vec<GitRefLabel>,
+}
+
+struct PushTarget {
+    remote_name: String,
+    remote_branch_name: String,
+    set_upstream: bool,
 }
 
 #[derive(Clone, Serialize)]
@@ -175,11 +183,15 @@ async fn commit_all(path: String, message: String) -> Result<GitStatusResponse, 
 }
 
 #[tauri::command]
-async fn commit_and_push(path: String, message: String) -> Result<GitStatusResponse, String> {
+async fn commit_and_push(
+    path: String,
+    message: String,
+    create_upstream_if_missing: bool,
+) -> Result<GitStatusResponse, String> {
     run_blocking(move || {
         let mut repository = open_repo(&path)?;
         create_commit(&repository, &message)?;
-        push_current_branch_to_origin(&repository)?;
+        push_current_branch_to_target(&repository, create_upstream_if_missing)?;
         build_repository_status(&mut repository)
     })
     .await
@@ -206,10 +218,13 @@ async fn pull_current_branch(path: String) -> Result<GitStatusResponse, String> 
 }
 
 #[tauri::command]
-async fn push_current_branch(path: String) -> Result<GitStatusResponse, String> {
+async fn push_current_branch(
+    path: String,
+    create_upstream_if_missing: bool,
+) -> Result<GitStatusResponse, String> {
     run_blocking(move || {
         let mut repository = open_repo(&path)?;
-        push_current_branch_to_origin(&repository)?;
+        push_current_branch_to_target(&repository, create_upstream_if_missing)?;
         build_repository_status(&mut repository)
     })
     .await
@@ -419,10 +434,9 @@ fn build_repository_status(repository: &mut Repository) -> Result<GitStatusRespo
     entries.sort_by(|left, right| left.path.cmp(&right.path));
     drop(statuses);
 
-    let branch = repository
-        .head()
-        .ok()
-        .and_then(|head| head.shorthand().map(ToOwned::to_owned))
+    let current_branch_name = current_local_branch_name(repository);
+    let branch = current_branch_name
+        .clone()
         .unwrap_or_else(|| "DETACHED".to_string());
 
     let head_summary = repository
@@ -447,6 +461,16 @@ fn build_repository_status(repository: &mut Repository) -> Result<GitStatusRespo
         .map(|oid| oid.to_string());
     let history_revision = build_history_revision(repository)?;
     let local_branch_syncs = load_local_branch_syncs(repository)?;
+    let current_branch_upstream_name = current_branch_name
+        .as_deref()
+        .map(|branch_name| {
+            repository
+                .find_branch(branch_name, git2::BranchType::Local)
+                .map_err(|error| format!("current branch could not be loaded: {}", error.message()))
+                .and_then(|branch| load_branch_upstream_name(&branch))
+        })
+        .transpose()?
+        .flatten();
     let (ahead_count, behind_count) = local_branch_syncs
         .iter()
         .find(|entry| entry.name == branch)
@@ -461,6 +485,8 @@ fn build_repository_status(repository: &mut Repository) -> Result<GitStatusRespo
     let stashes = load_stashes(repository)?;
     let submodules = load_submodules(repository)?;
     let has_origin_remote = has_remote(repository, "origin")?;
+    let can_push_current_branch = current_branch_name.is_some()
+        && (current_branch_upstream_name.is_some() || has_origin_remote);
 
     Ok(GitStatusResponse {
         repo_name,
@@ -469,6 +495,8 @@ fn build_repository_status(repository: &mut Repository) -> Result<GitStatusRespo
         head_oid,
         history_revision,
         has_origin_remote,
+        can_push_current_branch,
+        current_branch_upstream_name,
         ahead_count,
         behind_count,
         is_clean: entries.is_empty(),
@@ -509,6 +537,108 @@ fn load_branch_upstream_sync_counts(
                 error.message()
             )
         })
+}
+
+fn current_local_branch_name(repository: &Repository) -> Option<String> {
+    repository
+        .head()
+        .ok()
+        .and_then(|head| head.shorthand().map(ToOwned::to_owned))
+        .filter(|name| !name.is_empty() && name != "HEAD")
+}
+
+fn load_branch_upstream_name(branch: &git2::Branch<'_>) -> Result<Option<String>, String> {
+    let upstream = match branch.upstream() {
+        Ok(upstream) => upstream,
+        Err(_) => return Ok(None),
+    };
+
+    upstream
+        .name()
+        .map(|name| name.map(ToOwned::to_owned))
+        .map_err(|error| {
+            format!(
+                "upstream branch name could not be read: {}",
+                error.message()
+            )
+        })
+}
+
+fn parse_remote_branch_ref(reference_name: &str) -> Option<(String, String)> {
+    let shorthand = reference_name
+        .strip_prefix("refs/remotes/")
+        .unwrap_or(reference_name);
+    let (remote_name, branch_name) = shorthand.split_once('/')?;
+
+    if remote_name.is_empty() || branch_name.is_empty() {
+        return None;
+    }
+
+    Some((remote_name.to_string(), branch_name.to_string()))
+}
+
+fn resolve_push_target(
+    repository: &Repository,
+    create_upstream_if_missing: bool,
+) -> Result<(String, PushTarget), String> {
+    let local_branch_name = current_local_branch_name(repository)
+        .ok_or_else(|| "current branch could not be determined".to_string())?;
+    let branch = repository
+        .find_branch(&local_branch_name, git2::BranchType::Local)
+        .map_err(|error| format!("current branch could not be loaded: {}", error.message()))?;
+
+    if let Ok(upstream) = branch.upstream() {
+        if let Some(reference_name) = upstream.get().name() {
+            if let Some((remote_name, remote_branch_name)) = parse_remote_branch_ref(reference_name)
+            {
+                return Ok((
+                    local_branch_name,
+                    PushTarget {
+                        remote_name,
+                        remote_branch_name,
+                        set_upstream: false,
+                    },
+                ));
+            }
+        }
+
+        if let Some(shorthand) = upstream.name().map_err(|error| {
+            format!(
+                "upstream branch name could not be read: {}",
+                error.message()
+            )
+        })? {
+            if let Some((remote_name, remote_branch_name)) = parse_remote_branch_ref(shorthand) {
+                return Ok((
+                    local_branch_name,
+                    PushTarget {
+                        remote_name,
+                        remote_branch_name,
+                        set_upstream: false,
+                    },
+                ));
+            }
+        }
+
+        return Err("upstream branch could not be resolved".to_string());
+    }
+
+    if !create_upstream_if_missing {
+        return Err("current branch does not have an upstream branch".to_string());
+    }
+
+    if !has_remote(repository, "origin")? {
+        return Err("origin remote is not configured".to_string());
+    }
+
+    Ok((
+        local_branch_name.clone(),
+        PushTarget {
+            remote_name: "origin".to_string(),
+            remote_branch_name: local_branch_name,
+            set_upstream: true,
+        },
+    ))
 }
 
 fn create_commit(repository: &Repository, message: &str) -> Result<(), String> {
@@ -623,24 +753,17 @@ fn pull_current_branch_ff_only(repository: &Repository) -> Result<(), String> {
     Ok(())
 }
 
-fn push_current_branch_to_origin(repository: &Repository) -> Result<(), String> {
-    if !has_remote(repository, "origin")? {
-        return Err("origin remote is not configured".to_string());
-    }
-
-    let branch = repository
-        .head()
-        .ok()
-        .and_then(|head| head.shorthand().map(ToOwned::to_owned))
-        .filter(|name| !name.is_empty() && name != "HEAD")
-        .ok_or_else(|| "current branch could not be determined".to_string())?;
-
+fn push_current_branch_to_target(
+    repository: &Repository,
+    create_upstream_if_missing: bool,
+) -> Result<(), String> {
+    let (branch, target) = resolve_push_target(repository, create_upstream_if_missing)?;
     let output = git_command()
         .current_dir(repository_root(repository)?)
         .arg("push")
-        .arg("-u")
-        .arg("origin")
-        .arg(&branch)
+        .args(target.set_upstream.then_some("-u"))
+        .arg(&target.remote_name)
+        .arg(format!("{branch}:{}", target.remote_branch_name))
         .output()
         .map_err(|error| format!("Failed to run git push: {}", error))?;
 
@@ -1768,7 +1891,8 @@ fn load_local_branch_syncs(repository: &Repository) -> Result<Vec<GitLocalBranch
             .name()
             .map_err(|error| format!("ブランチ名を取得できませんでした: {}", error.message()))?
         {
-            let (ahead_count, behind_count) = load_branch_upstream_sync_counts(repository, &branch)?;
+            let (ahead_count, behind_count) =
+                load_branch_upstream_sync_counts(repository, &branch)?;
             syncs.push(GitLocalBranchSync {
                 name: name.to_string(),
                 ahead_count,

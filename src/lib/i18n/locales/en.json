@@ -37,6 +37,15 @@
   "push": {
     "missingOriginTitle": "Origin not configured",
     "missingOriginMessage": "This repository does not have an origin remote. Configure origin before pushing.",
+    "currentBranchUnavailableMessage": "The current branch could not be determined, so push is unavailable.",
+    "noUpstreamTitle": "No upstream branch",
+    "createBranchDescription": "{branch} does not have an upstream branch. Create {remote}/{branch} and push to it?",
+    "createBranchAfterCommitDescription": "{branch} does not have an upstream branch. Create {remote}/{branch} after committing and push to it?",
+    "targetLabel": "Push target",
+    "createAndPush": "Create Branch and Push",
+    "creatingAndPushing": "Creating Branch and Pushing...",
+    "commitCreateAndPush": "Commit and Push",
+    "commitCreatingAndPushing": "Committing and Pushing...",
     "dialogOk": "OK",
     "dialogCancel": "Cancel"
   },

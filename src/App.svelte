@@ -42,6 +42,8 @@
   let deleteForceEnabled = false;
   let discardDialogOpen = false;
   let discardPendingPaths = [];
+  let pushDialogOpen = false;
+  let pendingPushAction = null;
 
   const topActions = ["Fetch", "Pull", "Push", "Stash", "Discard"];
   const implementedTopActions = ["Fetch", "Pull", "Push", "Stash", "Discard"];
@@ -66,6 +68,8 @@
       head_summary: status.head_summary ?? null,
       history_revision: status.history_revision ?? "",
       has_origin_remote: status.has_origin_remote,
+      can_push_current_branch: status.can_push_current_branch ?? false,
+      current_branch_upstream_name: status.current_branch_upstream_name ?? null,
       ahead_count: status.ahead_count ?? 0,
       behind_count: status.behind_count ?? 0,
       is_clean: status.is_clean,
@@ -91,7 +95,8 @@
       Boolean(stashBusyAction) ||
       branchDialogOpen ||
       deleteDialogOpen ||
-      discardDialogOpen
+      discardDialogOpen ||
+      pushDialogOpen
     );
   }
 
@@ -120,6 +125,12 @@
     discardPendingPaths = [];
   }
 
+  function resetPushDialog(result = false) {
+    pendingPushAction?.resolve?.(result);
+    pushDialogOpen = false;
+    pendingPushAction = null;
+  }
+
   function closeBranchMenu() {
     branchMenuOpenKey = "";
   }
@@ -140,6 +151,7 @@
     selectedCommitDetail = null;
     selectedCommitDetailLoading = false;
     closeBranchMenu();
+    resetPushDialog();
     resetHistoryState();
     if (resetPane) {
       rightPaneExpanded = false;
@@ -202,6 +214,7 @@
       selectedCommitDetail = null;
       selectedCommitDetailLoading = false;
       closeBranchMenu();
+      resetPushDialog();
       rightPaneExpanded = false;
       rightPaneTab = "commit";
       void loadCommitHistory(repository.repo_path);
@@ -210,6 +223,95 @@
     } finally {
       loading = false;
       topbarBusyAction = "";
+    }
+  }
+
+  function currentBranchHasUpstream() {
+    return Boolean(repository?.current_branch_upstream_name);
+  }
+
+  function pushUnavailableMessage() {
+    if (!repository?.has_origin_remote && !currentBranchHasUpstream()) {
+      return t("push.missingOriginMessage");
+    }
+
+    return t("push.currentBranchUnavailableMessage");
+  }
+
+  function openPushDialog(kind, message = "") {
+    if (!repository) {
+      error = t("errors.openRepositoryFirst");
+      return Promise.resolve(false);
+    }
+
+    if (currentBranchHasUpstream()) {
+      return Promise.resolve(true);
+    }
+
+    if (!repository.has_origin_remote || !repository.can_push_current_branch) {
+      error = pushUnavailableMessage();
+      return Promise.resolve(false);
+    }
+
+    resetPushDialog(false);
+    error = "";
+
+    return new Promise((resolve) => {
+      pendingPushAction = { kind, message, resolve };
+      pushDialogOpen = true;
+    });
+  }
+
+  async function runPushCurrentBranch(createUpstreamIfMissing = false) {
+    if (!repository) {
+      error = t("errors.openRepositoryFirst");
+      return false;
+    }
+
+    loading = true;
+    topbarBusyAction = "Push";
+    error = "";
+
+    try {
+      repository = await invoke("push_current_branch", {
+        path: repository.repo_path,
+        createUpstreamIfMissing,
+      });
+      void loadCommitHistory(repository.repo_path);
+      return true;
+    } catch (message) {
+      error = String(message);
+      return false;
+    } finally {
+      loading = false;
+      topbarBusyAction = "";
+    }
+  }
+
+  async function runCommitAndPushChanges(message, createUpstreamIfMissing = false) {
+    if (!repository) {
+      error = t("errors.openRepositoryFirst");
+      return false;
+    }
+
+    commitAndPushing = true;
+    error = "";
+    try {
+      const updated = await invoke("commit_and_push", {
+        path: repository.repo_path,
+        message,
+        createUpstreamIfMissing,
+      });
+      repository = updated;
+      rightPaneExpanded = false;
+      rightPaneTab = "commit";
+      void loadCommitHistory(repository.repo_path);
+      return true;
+    } catch (messageText) {
+      error = String(messageText);
+      return false;
+    } finally {
+      commitAndPushing = false;
     }
   }
 
@@ -224,8 +326,18 @@
       return;
     }
 
-    if (action === "Push" && !repository.has_origin_remote) {
-      error = t("push.missingOriginMessage");
+    if (action === "Push") {
+      if (!repository.can_push_current_branch) {
+        error = pushUnavailableMessage();
+        return;
+      }
+
+      if (!currentBranchHasUpstream()) {
+        await openPushDialog("push");
+        return;
+      }
+
+      await runPushCurrentBranch(false);
       return;
     }
 
@@ -240,10 +352,6 @@
         });
       } else if (action === "Pull") {
         repository = await invoke("pull_current_branch", {
-          path: repository.repo_path,
-        });
-      } else if (action === "Push") {
-        repository = await invoke("push_current_branch", {
           path: repository.repo_path,
         });
       }
@@ -343,29 +451,16 @@
       return false;
     }
 
-    if (!repository.has_origin_remote) {
-      error = t("push.missingOriginMessage");
+    if (!repository.can_push_current_branch) {
+      error = pushUnavailableMessage();
       return false;
     }
 
-    commitAndPushing = true;
-    error = "";
-    try {
-      const updated = await invoke("commit_and_push", {
-        path: repository.repo_path,
-        message,
-      });
-      repository = updated;
-      rightPaneExpanded = false;
-      rightPaneTab = "commit";
-      void loadCommitHistory(repository.repo_path);
-      return true;
-    } catch (messageText) {
-      error = String(messageText);
-      return false;
-    } finally {
-      commitAndPushing = false;
+    if (!currentBranchHasUpstream()) {
+      return await openPushDialog("commit_and_push", message);
     }
+
+    return await runCommitAndPushChanges(message, false);
   }
 
   async function checkoutBranch(branchName, remoteName = null) {
@@ -435,6 +530,48 @@
       error = String(messageText);
     } finally {
       discarding = false;
+    }
+  }
+
+  function pushDialogTarget() {
+    if (!repository) {
+      return "origin";
+    }
+
+    return `origin/${repository.branch}`;
+  }
+
+  function pushDialogDescription() {
+    if (!repository) {
+      return "";
+    }
+
+    if (pendingPushAction?.kind === "commit_and_push") {
+      return t("push.createBranchAfterCommitDescription", {
+        branch: repository.branch,
+        remote: "origin",
+      });
+    }
+
+    return t("push.createBranchDescription", {
+      branch: repository.branch,
+      remote: "origin",
+    });
+  }
+
+  async function confirmPushDialog() {
+    if (!pendingPushAction) {
+      resetPushDialog(false);
+      return;
+    }
+
+    const success =
+      pendingPushAction.kind === "commit_and_push"
+        ? await runCommitAndPushChanges(pendingPushAction.message, true)
+        : await runPushCurrentBranch(true);
+
+    if (success) {
+      resetPushDialog(true);
     }
   }
 
@@ -1050,6 +1187,46 @@
           </button>
           <button class="dialog-button dialog-button-danger" type="button" on:click={confirmDiscardChanges} disabled={discarding}>
             {discarding ? t("discardDialog.discarding") : t("discardDialog.confirm")}
+          </button>
+        </div>
+      </section>
+    </div>
+  {/if}
+
+  {#if pushDialogOpen && repository}
+    <div
+      class="dialog-backdrop"
+      role="presentation"
+      on:click={(event) => event.target === event.currentTarget && !loading && !commitAndPushing && resetPushDialog(false)}
+    >
+      <section class="dialog-card" role="dialog" aria-modal="true" aria-labelledby="push-dialog-title">
+        <div class="dialog-copy">
+          <h2 id="push-dialog-title">{t("push.noUpstreamTitle")}</h2>
+          <p>{pushDialogDescription()}</p>
+        </div>
+
+        <div class="dialog-warning">
+          <span class="dialog-warning-label">{t("push.targetLabel")}</span>
+          <code>{pushDialogTarget()}</code>
+        </div>
+
+        <div class="dialog-actions">
+          <button
+            class="dialog-button dialog-button-muted"
+            type="button"
+            on:click={() => resetPushDialog(false)}
+            disabled={loading || commitAndPushing}
+          >
+            {t("push.dialogCancel")}
+          </button>
+          <button class="dialog-button" type="button" on:click={confirmPushDialog} disabled={loading || commitAndPushing}>
+            {pendingPushAction?.kind === "commit_and_push"
+              ? commitAndPushing
+                ? t("push.commitCreatingAndPushing")
+                : t("push.commitCreateAndPush")
+              : loading
+                ? t("push.creatingAndPushing")
+                : t("push.createAndPush")}
           </button>
         </div>
       </section>

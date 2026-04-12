@@ -37,6 +37,15 @@
   "push": {
     "missingOriginTitle": "origin が設定されていません",
     "missingOriginMessage": "このリポジトリには origin リモートがありません。Push の前に origin を設定してください。",
+    "currentBranchUnavailableMessage": "現在のブランチを特定できないため Push できません。",
+    "noUpstreamTitle": "upstream ブランチがありません",
+    "createBranchDescription": "{branch} には upstream ブランチがありません。{remote}/{branch} を作成して Push しますか。",
+    "createBranchAfterCommitDescription": "{branch} には upstream ブランチがありません。コミット後に {remote}/{branch} を作成して Push しますか。",
+    "targetLabel": "Push 先",
+    "createAndPush": "ブランチを作成して Push",
+    "creatingAndPushing": "作成して Push 中...",
+    "commitCreateAndPush": "コミットして Push",
+    "commitCreatingAndPushing": "コミットして Push 中...",
     "dialogOk": "OK",
     "dialogCancel": "キャンセル"
   },
