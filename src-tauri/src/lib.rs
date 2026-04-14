@@ -14,7 +14,15 @@ use tauri::Manager;
 const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 
 fn window_state_flags() -> tauri_plugin_window_state::StateFlags {
-    tauri_plugin_window_state::StateFlags::all()
+    #[cfg(target_os = "linux")]
+    let mut flags = tauri_plugin_window_state::StateFlags::all();
+    #[cfg(not(target_os = "linux"))]
+    let flags = tauri_plugin_window_state::StateFlags::all();
+
+    #[cfg(target_os = "linux")]
+    flags.remove(tauri_plugin_window_state::StateFlags::MAXIMIZED);
+
+    flags
 }
 
 async fn run_blocking<T, F>(job: F) -> Result<T, String>
