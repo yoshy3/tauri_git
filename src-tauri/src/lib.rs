@@ -4,8 +4,6 @@ use git2::{
 };
 use serde::Serialize;
 use std::collections::{BTreeMap, HashMap};
-#[cfg(target_os = "linux")]
-use std::env;
 #[cfg(windows)]
 use std::os::windows::process::CommandExt;
 use std::path::PathBuf;
@@ -16,24 +14,7 @@ use tauri::Manager;
 const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 
 fn window_state_flags() -> tauri_plugin_window_state::StateFlags {
-    #[cfg(target_os = "linux")]
-    let mut flags = tauri_plugin_window_state::StateFlags::all();
-    #[cfg(not(target_os = "linux"))]
-    let flags = tauri_plugin_window_state::StateFlags::all();
-
-    #[cfg(target_os = "linux")]
-    if is_wayland_session() {
-        flags.remove(tauri_plugin_window_state::StateFlags::POSITION);
-        flags.remove(tauri_plugin_window_state::StateFlags::VISIBLE);
-    }
-
-    flags
-}
-
-#[cfg(target_os = "linux")]
-fn is_wayland_session() -> bool {
-    matches!(env::var("XDG_SESSION_TYPE").ok().as_deref(), Some("wayland"))
-        || env::var_os("WAYLAND_DISPLAY").is_some()
+    tauri_plugin_window_state::StateFlags::all()
 }
 
 async fn run_blocking<T, F>(job: F) -> Result<T, String>
@@ -2101,10 +2082,6 @@ pub fn run() {
             let window = app.get_webview_window("main").unwrap();
             let title = format!("Tauri Git v{}", env!("CARGO_PKG_VERSION"));
             window.set_title(&title)?;
-            #[cfg(target_os = "linux")]
-            if is_wayland_session() {
-                window.show()?;
-            }
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
