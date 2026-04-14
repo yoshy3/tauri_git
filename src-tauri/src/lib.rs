@@ -16,7 +16,10 @@ use tauri::Manager;
 const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 
 fn window_state_flags() -> tauri_plugin_window_state::StateFlags {
+    #[cfg(target_os = "linux")]
     let mut flags = tauri_plugin_window_state::StateFlags::all();
+    #[cfg(not(target_os = "linux"))]
+    let flags = tauri_plugin_window_state::StateFlags::all();
 
     #[cfg(target_os = "linux")]
     if is_wayland_session() {
@@ -2098,6 +2101,10 @@ pub fn run() {
             let window = app.get_webview_window("main").unwrap();
             let title = format!("Tauri Git v{}", env!("CARGO_PKG_VERSION"));
             window.set_title(&title)?;
+            #[cfg(target_os = "linux")]
+            if is_wayland_session() {
+                window.show()?;
+            }
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
