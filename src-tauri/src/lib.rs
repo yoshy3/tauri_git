@@ -4,6 +4,8 @@ use git2::{
 };
 use serde::Serialize;
 use std::collections::{BTreeMap, HashMap};
+#[cfg(target_os = "linux")]
+use std::env;
 #[cfg(windows)]
 use std::os::windows::process::CommandExt;
 use std::path::PathBuf;
@@ -12,6 +14,24 @@ use tauri::Manager;
 
 #[cfg(windows)]
 const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+
+fn window_state_flags() -> tauri_plugin_window_state::StateFlags {
+    let mut flags = tauri_plugin_window_state::StateFlags::all();
+
+    #[cfg(target_os = "linux")]
+    if is_wayland_session() {
+        flags.remove(tauri_plugin_window_state::StateFlags::POSITION);
+        flags.remove(tauri_plugin_window_state::StateFlags::VISIBLE);
+    }
+
+    flags
+}
+
+#[cfg(target_os = "linux")]
+fn is_wayland_session() -> bool {
+    matches!(env::var("XDG_SESSION_TYPE").ok().as_deref(), Some("wayland"))
+        || env::var_os("WAYLAND_DISPLAY").is_some()
+}
 
 async fn run_blocking<T, F>(job: F) -> Result<T, String>
 where
@@ -2065,11 +2085,13 @@ fn resolve_tag_target_oid(
 }
 
 pub fn run() {
+    let state_flags = window_state_flags();
+
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(
             tauri_plugin_window_state::Builder::default()
-                .with_state_flags(tauri_plugin_window_state::StateFlags::all())
+                .with_state_flags(state_flags)
                 .build(),
         )
         .setup(|app| {

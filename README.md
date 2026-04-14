@@ -53,7 +53,8 @@ Tauri Git is a desktop Git client focused on a compact workflow:
 - Optional force delete for unmerged local branches
 - English / Japanese UI switching
 - Dark / light theme switching with saved preference
-- Window size and position persistence across restarts
+- Window size persistence across restarts
+- Window position persistence across restarts except on Wayland
 - Flicker-free window restore on startup (restores while hidden, then shows)
 
 ## Release Build Notes
@@ -144,8 +145,8 @@ src-tauri/  Tauri + Rust backend
 - Some Git operations are implemented through the system `git` command for compatibility with familiar workflows.
 - The application currently targets a minimal desktop workflow rather than full parity with large Git GUI clients.
 - The side-by-side compare view is available from both commit details and the changes panel.
-- Theme preference is stored locally and restored on the next launch.
-- Window size and position are persisted and restored automatically on the next launch.
+- Theme preference is persisted and restored automatically on the next launch.
+- Window size is persisted and restored automatically on the next launch. Window position restore is limited on Linux Wayland sessions.
 
 ## License
 
