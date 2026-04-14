@@ -15,7 +15,8 @@
         "title": "Tauri Git",
         "width": 1440,
         "height": 860,
-        "resizable": true
+        "resizable": true,
+        "visible": false
       }
     ],
     "security": {

@@ -2067,6 +2067,11 @@ fn resolve_tag_target_oid(
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
+        .plugin(
+            tauri_plugin_window_state::Builder::default()
+                .with_state_flags(tauri_plugin_window_state::StateFlags::all())
+                .build(),
+        )
         .setup(|app| {
             let window = app.get_webview_window("main").unwrap();
             let title = format!("Tauri Git v{}", env!("CARGO_PKG_VERSION"));
