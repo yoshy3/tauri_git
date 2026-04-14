@@ -22,7 +22,12 @@
     "discard": "破棄",
     "pop": "Pop",
     "refresh": "更新",
-    "syncing": "同期中..."
+    "syncing": "同期中...",
+    "theme": "テーマ",
+    "light": "ライト",
+    "dark": "ダーク",
+    "switchToLight": "ライトモードに切り替え",
+    "switchToDark": "ダークモードに切り替え"
   },
   "discardDialog": {
     "title": "変更を破棄",

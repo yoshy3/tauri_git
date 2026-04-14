@@ -52,6 +52,7 @@ Tauri Git is a desktop Git client focused on a compact workflow:
 - Safe delete confirmation with branch-name input
 - Optional force delete for unmerged local branches
 - English / Japanese UI switching
+- Dark / light theme switching with saved preference
 
 ## Release Build Notes
 
@@ -141,6 +142,7 @@ src-tauri/  Tauri + Rust backend
 - Some Git operations are implemented through the system `git` command for compatibility with familiar workflows.
 - The application currently targets a minimal desktop workflow rather than full parity with large Git GUI clients.
 - The side-by-side compare view is available from both commit details and the changes panel.
+- Theme preference is stored locally and restored on the next launch.
 
 ## License
 

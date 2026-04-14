@@ -408,8 +408,8 @@
   .sidebar {
     min-height: 0;
     padding: 8px;
-    border-right: 1px solid rgba(114, 144, 175, 0.06);
-    background: linear-gradient(180deg, rgba(10, 17, 26, 0.98), rgba(8, 15, 23, 0.96));
+    border-right: 1px solid var(--row-border);
+    background: var(--sidebar-background);
     display: grid;
     grid-template-rows: auto auto auto 1fr;
     gap: 8px;
@@ -422,10 +422,10 @@
 
   .sidebar-tool {
     width: 100%;
-    border: 1px solid rgba(120, 148, 177, 0.12);
+    border: 1px solid var(--surface-border);
     border-radius: 10px;
-    background: rgba(12, 23, 35, 0.82);
-    color: #95a7ba;
+    background: var(--surface-background);
+    color: var(--text-muted);
     padding: 9px 12px;
     font-size: 0.76rem;
     font-weight: 700;
@@ -438,7 +438,7 @@
     background: var(--panel-background);
     border: 1px solid var(--panel-border);
     border-radius: 10px;
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.02);
+    box-shadow: var(--panel-shadow);
   }
 
   .sidebar-summary {
@@ -462,12 +462,12 @@
     margin: 0;
     font-size: 1rem;
     line-height: 1.15;
-    color: #f4f8fc;
+    color: var(--text-primary);
   }
 
   .sidebar-branch-name {
     margin: 4px 0 0;
-    color: #d8e6f3;
+    color: var(--text-secondary);
     font-size: 0.84rem;
     font-weight: 600;
   }
@@ -478,19 +478,19 @@
     flex-shrink: 0;
     margin-top: 4px;
     border-radius: 999px;
-    background: #f2a95c;
-    box-shadow: 0 0 0 1px rgba(242, 169, 92, 0.16);
+    background: var(--warning-fill);
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--warning-fill) 25%, transparent);
   }
 
   .repo-status-indicator.repo-status-clean {
-    background: #63d39c;
-    box-shadow: 0 0 0 1px rgba(99, 211, 156, 0.16);
+    background: var(--success-fill);
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--success-fill) 25%, transparent);
   }
 
   .path,
   .muted {
     margin: 0;
-    color: #6c849c;
+    color: var(--text-subtle);
   }
 
   .path {
@@ -506,19 +506,19 @@
   .sidebar-filter {
     width: 100%;
     box-sizing: border-box;
-    border: 1px solid rgba(120, 148, 177, 0.12);
+    border: 1px solid var(--input-border);
     border-radius: 10px;
-    background: rgba(5, 10, 16, 0.92);
-    color: #e8eef5;
+    background: var(--input-background-strong);
+    color: var(--text-secondary);
     padding: 10px 12px;
     transition: border-color 120ms ease, box-shadow 120ms ease, background 120ms ease;
   }
 
   .sidebar-filter:focus {
     outline: none;
-    border-color: rgba(84, 155, 233, 0.7);
-    box-shadow: 0 0 0 3px rgba(35, 101, 168, 0.18);
-    background: #06101a;
+    border-color: var(--input-border-focus);
+    box-shadow: var(--focus-ring);
+    background: var(--input-background-focus);
   }
 
   .sidebar-tree {
@@ -543,7 +543,7 @@
     width: 100%;
     border: 0;
     background: transparent;
-    color: #eef5fb;
+    color: var(--text-primary);
     display: flex;
     align-items: center;
     gap: 8px;
@@ -556,7 +556,7 @@
   }
 
   .tree-group-toggle {
-    color: #d9e5f1;
+    color: var(--text-secondary);
     font-size: 0.77rem;
     font-weight: 600;
     padding-left: 0;
@@ -565,15 +565,15 @@
   }
 
   .tree-group-toggle:hover {
-    background: rgba(255, 255, 255, 0.03);
+    background: var(--hover-overlay-soft);
   }
 
   .tree-chevron {
     width: 7px;
     height: 7px;
     flex-shrink: 0;
-    border-right: 2px solid #7f93a8;
-    border-bottom: 2px solid #7f93a8;
+    border-right: 2px solid var(--text-muted);
+    border-bottom: 2px solid var(--text-muted);
     transform: rotate(-45deg) translateY(-1px);
     transform-origin: 50% 50%;
     transition: transform 160ms ease;
@@ -611,7 +611,7 @@
 
   .tree-group-expanded > .tree-group-toggle,
   .tree-group-details.tree-group-expanded > .tree-group-toggle {
-    color: #eef5fb;
+    color: var(--text-primary);
   }
 
   .tree-item {
@@ -622,7 +622,7 @@
     min-height: 24px;
     padding: 3px 8px 3px 4px;
     border-radius: 8px;
-    color: #abbcce;
+    color: var(--text-muted);
     font-size: 0.78rem;
     box-sizing: border-box;
   }
@@ -636,8 +636,8 @@
   }
 
   .tree-item-button:hover:enabled {
-    background: rgba(255, 255, 255, 0.04);
-    color: #eef5fb;
+    background: var(--hover-overlay);
+    color: var(--text-primary);
   }
 
   .tree-item-button:disabled {
@@ -703,7 +703,7 @@
   .tree-empty {
     margin: 0;
     padding: 0 4px 2px 12px;
-    color: #6f859c;
+    color: var(--text-subtle);
     font-size: 0.72rem;
     line-height: 1.35;
   }
@@ -719,8 +719,8 @@
     padding: 8px 10px;
     min-width: 0;
     border-radius: 10px;
-    background: rgba(255, 255, 255, 0.03);
-    border: 1px solid rgba(120, 148, 177, 0.08);
+    background: var(--hover-overlay-soft);
+    border: 1px solid var(--panel-border);
   }
 
   .stash-actions-copy {
@@ -730,13 +730,13 @@
   }
 
   .stash-actions-copy strong {
-    color: #eef5fb;
+    color: var(--text-primary);
     font-size: 0.75rem;
     line-height: 1.2;
   }
 
   .stash-actions-copy span {
-    color: #7f95aa;
+    color: var(--text-muted);
     font-size: 0.69rem;
     white-space: nowrap;
     overflow: hidden;
@@ -755,8 +755,8 @@
     min-width: 0;
     border: 0;
     border-radius: 8px;
-    background: rgba(32, 84, 138, 0.22);
-    color: #eaf4fd;
+    background: var(--accent-soft);
+    color: var(--accent-contrast);
     padding: 7px 10px;
     font-size: 0.69rem;
     font-weight: 700;
@@ -770,27 +770,27 @@
   }
 
   .stash-action-button:hover:enabled {
-    background: rgba(39, 100, 163, 0.34);
+    background: var(--surface-background-hover);
   }
 
   .stash-action-button-neutral {
-    background: rgba(17, 30, 43, 0.92);
-    color: #c8d6e4;
-    border: 1px solid rgba(120, 148, 177, 0.12);
+    background: var(--surface-background-muted);
+    color: var(--text-secondary);
+    border: 1px solid var(--surface-border);
   }
 
   .stash-action-button-neutral:hover:enabled {
-    background: rgba(25, 40, 56, 0.96);
+    background: var(--surface-background-hover);
   }
 
   .stash-action-button-danger {
     grid-column: 1 / -1;
-    background: rgba(132, 59, 39, 0.24);
-    color: #ffd6c7;
+    background: var(--danger-soft);
+    color: var(--danger-text);
   }
 
   .stash-action-button-danger:hover:enabled {
-    background: rgba(156, 70, 46, 0.34);
+    background: color-mix(in srgb, var(--danger-soft) 82%, var(--danger-strong) 18%);
   }
 
   @media (max-width: 860px) {

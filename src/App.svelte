@@ -44,10 +44,12 @@
   let discardPendingPaths = [];
   let pushDialogOpen = false;
   let pendingPushAction = null;
+  let theme = "dark";
 
   const topActions = ["Fetch", "Pull", "Push", "Stash", "Discard"];
   const implementedTopActions = ["Fetch", "Pull", "Push", "Stash", "Discard"];
   const lastRepositoryKey = "tauri-git:last-repository-path";
+  const themeStorageKey = "tauri-git:theme";
   const historyBatchSize = 100;
   const autoRefreshIntervalMs = 2500;
   let autoRefreshInFlight = false;
@@ -133,6 +135,16 @@
 
   function closeBranchMenu() {
     branchMenuOpenKey = "";
+  }
+
+  function applyTheme(nextTheme) {
+    theme = nextTheme === "light" ? "light" : "dark";
+    document.documentElement.dataset.theme = theme;
+    localStorage.setItem(themeStorageKey, theme);
+  }
+
+  function toggleTheme() {
+    applyTheme(theme === "dark" ? "light" : "dark");
   }
 
   async function openRepositoryAt(path, options = {}) {
@@ -885,6 +897,8 @@
   }
 
   onMount(() => {
+    applyTheme(localStorage.getItem(themeStorageKey) ?? "dark");
+
     const handleVisibilityChange = () => {
       appVisible = document.visibilityState === "visible";
       if (appVisible) {
@@ -1032,11 +1046,13 @@
   <TopBar
     {repository}
     {loading}
+    {theme}
     {topActions}
     implementedActions={implementedTopActions}
     activeAction={topbarBusyAction}
     onAction={handleTopAction}
     onRefresh={refreshRepository}
+    onToggleTheme={toggleTheme}
   />
 
   <main class:workspace-collapsed={!rightPaneExpanded} class="workspace">
@@ -1261,7 +1277,7 @@
     display: grid;
     place-items: center;
     padding: 20px;
-    background: rgba(4, 10, 16, 0.66);
+    background: var(--backdrop-background);
     backdrop-filter: blur(8px);
     z-index: 20;
   }
@@ -1272,20 +1288,20 @@
     gap: 14px;
     padding: 18px;
     border-radius: 14px;
-    background: linear-gradient(180deg, rgba(11, 23, 36, 0.98), rgba(10, 21, 33, 0.97));
-    border: 1px solid rgba(120, 148, 177, 0.14);
-    box-shadow: 0 18px 48px rgba(0, 0, 0, 0.34);
+    background: var(--dialog-background);
+    border: 1px solid var(--surface-border-strong);
+    box-shadow: var(--dialog-shadow);
   }
 
   .dialog-copy h2 {
     margin: 0;
-    color: #f4f8fc;
+    color: var(--text-primary);
     font-size: 1rem;
   }
 
   .dialog-copy p {
     margin: 6px 0 0;
-    color: #9cb1c7;
+    color: var(--text-muted);
     font-size: 0.82rem;
     line-height: 1.4;
     word-break: break-word;
@@ -1298,25 +1314,25 @@
 
   .dialog-field span,
   .dialog-checkbox span {
-    color: #cfe0f2;
+    color: var(--text-secondary);
     font-size: 0.78rem;
   }
 
   .dialog-field input {
     width: 100%;
     box-sizing: border-box;
-    border: 1px solid rgba(120, 148, 177, 0.14);
+    border: 1px solid var(--surface-border);
     border-radius: 10px;
-    background: #040a10;
-    color: #e8eef5;
+    background: var(--input-background);
+    color: var(--text-secondary);
     padding: 11px 12px;
   }
 
   .dialog-field input:focus {
     outline: none;
-    border-color: rgba(84, 155, 233, 0.7);
-    box-shadow: 0 0 0 3px rgba(35, 101, 168, 0.18);
-    background: #06101a;
+    border-color: var(--input-border-focus);
+    box-shadow: var(--focus-ring);
+    background: var(--input-background-focus);
   }
 
   .dialog-checkbox {
@@ -1326,7 +1342,7 @@
   }
 
   .dialog-checkbox input[type="checkbox"] {
-    accent-color: #4da0ff;
+    accent-color: var(--accent);
   }
 
   .dialog-actions {
@@ -1340,19 +1356,19 @@
     gap: 4px;
     padding: 10px 12px;
     border-radius: 10px;
-    background: rgba(134, 63, 43, 0.12);
-    border: 1px solid rgba(190, 104, 76, 0.2);
+    background: var(--danger-soft);
+    border: 1px solid var(--danger-border);
   }
 
   .dialog-warning-label,
   .dialog-helper {
-    color: #cfe0f2;
+    color: var(--text-secondary);
     font-size: 0.74rem;
     line-height: 1.4;
   }
 
   .dialog-warning code {
-    color: #ffd8cb;
+    color: var(--danger-text);
     font-size: 0.8rem;
     word-break: break-word;
   }
@@ -1360,8 +1376,8 @@
   .dialog-button {
     border: 0;
     border-radius: 10px;
-    background: linear-gradient(180deg, #1e68b0, #0d57a0);
-    color: #eef5ff;
+    background: linear-gradient(180deg, var(--accent-strong), var(--accent-strong-2));
+    color: var(--accent-contrast);
     padding: 10px 14px;
     font-size: 0.76rem;
     font-weight: 700;
@@ -1369,13 +1385,13 @@
   }
 
   .dialog-button.dialog-button-muted {
-    background: rgba(17, 30, 43, 0.92);
-    color: #c8d6e4;
-    border: 1px solid rgba(120, 148, 177, 0.12);
+    background: var(--surface-background-muted);
+    color: var(--text-secondary);
+    border: 1px solid var(--surface-border);
   }
 
   .dialog-button.dialog-button-danger {
-    background: linear-gradient(180deg, #9a4a34, #7d3526);
+    background: linear-gradient(180deg, var(--danger-strong), var(--danger-strong-2));
   }
 
   @media (max-width: 1180px) {

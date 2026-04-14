@@ -177,7 +177,7 @@
     width: 100%;
     border: 0;
     background: transparent;
-    color: #abbcce;
+    color: var(--text-muted);
     display: grid;
     align-items: center;
     min-height: 24px;
@@ -208,7 +208,7 @@
     align-items: center;
     justify-self: end;
     gap: 6px;
-    color: #8fbaf0;
+    color: var(--accent);
     font-size: 0.73rem;
     font-weight: 700;
     font-variant-numeric: tabular-nums;
@@ -229,19 +229,19 @@
 
   .tree-item-row:hover,
   .tree-group-toggle:hover {
-    background: rgba(255, 255, 255, 0.04);
-    color: #eef5fb;
+    background: var(--hover-overlay);
+    color: var(--text-primary);
   }
 
   .tree-item-row.tree-item-current {
-    background: rgba(101, 168, 239, 0.2);
-    color: #eef7ff;
+    background: var(--accent-soft);
+    color: var(--text-primary);
     font-weight: 700;
-    box-shadow: inset 0 0 0 1px rgba(108, 177, 248, 0.28);
+    box-shadow: inset 0 0 0 1px var(--accent-soft-border);
   }
 
   .tree-item-row.tree-item-current .tree-item-sync {
-    color: #eef7ff;
+    color: var(--text-primary);
   }
 
   .tree-item-actions {
@@ -269,13 +269,13 @@
     gap: 3px;
     border: 0;
     border-radius: 7px;
-    background: rgba(10, 20, 31, 0.92);
-    color: #dce8f4;
+    background: var(--surface-background-strong);
+    color: var(--text-secondary);
     padding: 0;
   }
 
   .tree-item-kebab:hover:enabled {
-    background: rgba(25, 50, 75, 0.95);
+    background: var(--surface-background-hover);
   }
 
   .tree-item-kebab span {
@@ -294,9 +294,9 @@
     gap: 2px;
     padding: 6px;
     border-radius: 10px;
-    background: rgba(9, 18, 28, 0.98);
-    border: 1px solid rgba(120, 148, 177, 0.16);
-    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.35);
+    background: var(--dialog-background);
+    border: 1px solid var(--surface-border-strong);
+    box-shadow: var(--dialog-shadow);
     z-index: 8;
   }
 
@@ -304,22 +304,22 @@
     border: 0;
     border-radius: 7px;
     background: transparent;
-    color: #dce8f4;
+    color: var(--text-secondary);
     padding: 8px 10px;
     font-size: 0.74rem;
     text-align: left;
   }
 
   .tree-item-menu-button:hover:enabled {
-    background: rgba(255, 255, 255, 0.05);
+    background: var(--hover-overlay);
   }
 
   .tree-item-menu-button.tree-item-menu-button-danger {
-    color: #ffd3cc;
+    color: var(--danger-text);
   }
 
   .tree-item-menu-button.tree-item-menu-button-danger:hover:enabled {
-    background: rgba(156, 70, 46, 0.18);
+    background: var(--danger-soft);
   }
 
   .tree-group-toggle {
@@ -368,7 +368,7 @@
   }
 
   .branch-folder-toggle {
-    color: #d9e5f1;
+    color: var(--text-secondary);
     font-weight: 600;
   }
 
@@ -380,8 +380,8 @@
     width: 7px;
     height: 7px;
     flex-shrink: 0;
-    border-right: 2px solid #7f93a8;
-    border-bottom: 2px solid #7f93a8;
+    border-right: 2px solid var(--text-muted);
+    border-bottom: 2px solid var(--text-muted);
     transform: rotate(-45deg) translateY(-1px);
     transform-origin: 50% 50%;
     transition: transform 160ms ease;

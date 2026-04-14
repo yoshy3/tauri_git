@@ -1,17 +1,190 @@
 :root {
   font-family: "Avenir Next", "Hiragino Sans", sans-serif;
+  color-scheme: dark;
   color: #d5deea;
   background:
     radial-gradient(circle at top left, rgba(18, 49, 82, 0.5), transparent 22%),
     radial-gradient(circle at bottom right, rgba(16, 38, 64, 0.35), transparent 24%),
     linear-gradient(180deg, #07111a 0%, #0a1621 100%);
+  --app-background:
+    radial-gradient(circle at top left, rgba(18, 49, 82, 0.5), transparent 22%),
+    radial-gradient(circle at bottom right, rgba(16, 38, 64, 0.35), transparent 24%),
+    linear-gradient(180deg, #07111a 0%, #0a1621 100%);
+  --text-primary: #eef5fb;
+  --text-secondary: #dce7f2;
+  --text-muted: #8aa0b8;
+  --text-subtle: #6f859c;
   --panel-background: linear-gradient(180deg, rgba(11, 23, 36, 0.98), rgba(11, 22, 34, 0.95));
   --panel-border: rgba(120, 148, 177, 0.08);
+  --panel-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.02);
+  --panel-soft-background: rgba(8, 16, 24, 0.64);
+  --surface-background: rgba(12, 23, 35, 0.82);
+  --surface-background-strong: rgba(12, 24, 38, 0.96);
+  --surface-background-hover: rgba(18, 37, 56, 0.92);
+  --surface-background-muted: rgba(17, 30, 43, 0.92);
+  --surface-border: rgba(120, 148, 177, 0.12);
+  --surface-border-strong: rgba(120, 148, 177, 0.16);
+  --hover-overlay: rgba(255, 255, 255, 0.04);
+  --hover-overlay-soft: rgba(255, 255, 255, 0.03);
+  --header-background: linear-gradient(180deg, rgba(6, 14, 23, 0.98), rgba(8, 17, 27, 0.93));
+  --header-border: rgba(114, 144, 175, 0.1);
+  --sidebar-background: linear-gradient(180deg, rgba(10, 17, 26, 0.98), rgba(8, 15, 23, 0.96));
+  --center-background: linear-gradient(180deg, rgba(11, 22, 34, 0.6), rgba(10, 20, 31, 0.36));
+  --input-background: #040a10;
+  --input-background-strong: rgba(5, 10, 16, 0.92);
+  --input-background-focus: #06101a;
+  --input-border: rgba(120, 148, 177, 0.12);
+  --input-border-focus: rgba(84, 155, 233, 0.7);
+  --focus-ring: 0 0 0 3px rgba(35, 101, 168, 0.18);
+  --accent: #4da0ff;
+  --accent-strong: #1e68b0;
+  --accent-strong-2: #0d57a0;
+  --accent-soft: rgba(32, 84, 138, 0.22);
+  --accent-soft-border: rgba(77, 160, 255, 0.22);
+  --accent-contrast: #eef5ff;
+  --success-soft: rgba(64, 119, 84, 0.18);
+  --success-text: #8ed5a6;
+  --success-fill: #63d39c;
+  --warning-soft: rgba(144, 92, 14, 0.22);
+  --warning-text: #ffd48a;
+  --warning-fill: #f2a95c;
+  --danger-soft: rgba(143, 64, 42, 0.16);
+  --danger-border: rgba(193, 101, 71, 0.28);
+  --danger-text: #ffd7cb;
+  --danger-strong: #9a4a34;
+  --danger-strong-2: #7d3526;
+  --danger-soft-row: rgba(168, 76, 76, 0.16);
+  --danger-soft-inline: rgba(255, 129, 129, 0.28);
+  --warning-soft-row: rgba(122, 95, 42, 0.16);
+  --success-soft-row: rgba(74, 163, 108, 0.16);
+  --modified-soft-row: rgba(64, 119, 84, 0.18);
+  --patch-background: #0a1118;
+  --row-border: rgba(120, 148, 177, 0.06);
+  --muted-row-background: rgba(255, 255, 255, 0.01);
+  --selected-row-background: rgba(35, 82, 135, 0.22);
+  --selected-row-shadow: inset 0 0 0 1px rgba(77, 160, 255, 0.18);
+  --backdrop-background: rgba(4, 10, 16, 0.66);
+  --dialog-background: linear-gradient(180deg, rgba(11, 23, 36, 0.98), rgba(10, 21, 33, 0.97));
+  --dialog-shadow: 0 18px 48px rgba(0, 0, 0, 0.34);
+  --modal-backdrop: rgba(2, 7, 12, 0.72);
+  --modal-shadow: 0 28px 64px rgba(0, 0, 0, 0.48);
+  --status-remote-bg: rgba(60, 74, 94, 0.5);
+  --status-remote-text: #d4dde7;
+  --status-remote-shadow: inset 0 0 0 1px rgba(114, 138, 167, 0.2);
+  --status-tag-bg: rgba(22, 86, 67, 0.2);
+  --status-tag-text: #8ef0cb;
+  --status-tag-shadow: inset 0 0 0 1px rgba(78, 204, 163, 0.42);
+  --status-current-bg: rgba(164, 102, 11, 0.28);
+  --status-current-text: #fff4d9;
+  --status-current-shadow: inset 0 0 0 1px rgba(241, 170, 55, 0.75);
+  --status-local-bg: rgba(144, 92, 14, 0.22);
+  --status-local-text: #ffd48a;
+  --status-local-shadow: inset 0 0 0 1px rgba(218, 146, 33, 0.35);
+  --selection-danger-background: linear-gradient(180deg, rgba(63, 28, 22, 0.9), rgba(47, 20, 16, 0.9));
+  --selection-danger-border: rgba(204, 110, 84, 0.62);
+  --selection-danger-shadow: inset 0 0 0 1px rgba(214, 118, 92, 0.12);
+  --selection-accent-background: linear-gradient(180deg, rgba(18, 40, 61, 0.92), rgba(15, 31, 47, 0.92));
+  --selection-accent-border: rgba(84, 155, 233, 0.58);
+  --selection-accent-shadow: inset 0 0 0 1px rgba(77, 160, 255, 0.12);
   --scrollbar-track: rgba(7, 15, 23, 0.92);
   --scrollbar-thumb: linear-gradient(180deg, rgba(143, 159, 177, 0.92), rgba(111, 128, 148, 0.94));
   --scrollbar-thumb-hover: linear-gradient(180deg, rgba(177, 193, 212, 0.96), rgba(132, 151, 172, 0.98));
   --scrollbar-thumb-active: linear-gradient(180deg, rgba(201, 214, 228, 0.98), rgba(150, 168, 188, 1));
   --scrollbar-border: rgba(9, 18, 28, 0.9);
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+  color: #223447;
+  background:
+    radial-gradient(circle at top left, rgba(133, 180, 226, 0.35), transparent 24%),
+    radial-gradient(circle at bottom right, rgba(165, 210, 206, 0.28), transparent 26%),
+    linear-gradient(180deg, #eef5fb 0%, #dfeaf4 100%);
+  --app-background:
+    radial-gradient(circle at top left, rgba(133, 180, 226, 0.35), transparent 24%),
+    radial-gradient(circle at bottom right, rgba(165, 210, 206, 0.28), transparent 26%),
+    linear-gradient(180deg, #eef5fb 0%, #dfeaf4 100%);
+  --text-primary: #183146;
+  --text-secondary: #284258;
+  --text-muted: #53708a;
+  --text-subtle: #69829a;
+  --panel-background: linear-gradient(180deg, rgba(252, 254, 255, 0.96), rgba(242, 247, 251, 0.96));
+  --panel-border: rgba(108, 138, 168, 0.16);
+  --panel-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72);
+  --panel-soft-background: rgba(234, 241, 247, 0.88);
+  --surface-background: rgba(241, 247, 251, 0.96);
+  --surface-background-strong: rgba(236, 243, 248, 0.98);
+  --surface-background-hover: rgba(225, 236, 246, 0.98);
+  --surface-background-muted: rgba(230, 239, 247, 0.96);
+  --surface-border: rgba(108, 138, 168, 0.2);
+  --surface-border-strong: rgba(108, 138, 168, 0.24);
+  --hover-overlay: rgba(54, 90, 124, 0.1);
+  --hover-overlay-soft: rgba(54, 90, 124, 0.07);
+  --header-background: linear-gradient(180deg, rgba(249, 252, 255, 0.98), rgba(237, 244, 249, 0.96));
+  --header-border: rgba(108, 138, 168, 0.18);
+  --sidebar-background: linear-gradient(180deg, rgba(241, 247, 251, 0.98), rgba(231, 239, 246, 0.96));
+  --center-background: linear-gradient(180deg, rgba(247, 251, 254, 0.78), rgba(236, 244, 249, 0.52));
+  --input-background: #f7fbff;
+  --input-background-strong: rgba(247, 251, 255, 0.98);
+  --input-background-focus: #ffffff;
+  --input-border: rgba(108, 138, 168, 0.22);
+  --input-border-focus: rgba(54, 129, 211, 0.72);
+  --focus-ring: 0 0 0 3px rgba(88, 150, 216, 0.18);
+  --accent: #2f7fd4;
+  --accent-strong: #3d88d6;
+  --accent-strong-2: #2b73be;
+  --accent-soft: rgba(72, 130, 196, 0.16);
+  --accent-soft-border: rgba(47, 127, 212, 0.24);
+  --accent-contrast: #f8fbff;
+  --success-soft: rgba(69, 154, 108, 0.12);
+  --success-text: #26744a;
+  --success-fill: #3dad72;
+  --warning-soft: rgba(200, 143, 51, 0.14);
+  --warning-text: #9a6113;
+  --warning-fill: #d69647;
+  --danger-soft: rgba(184, 92, 71, 0.12);
+  --danger-border: rgba(190, 108, 90, 0.24);
+  --danger-text: #983c2d;
+  --danger-strong: #c2634f;
+  --danger-strong-2: #a74e3d;
+  --danger-soft-row: rgba(211, 117, 101, 0.12);
+  --danger-soft-inline: rgba(221, 121, 121, 0.2);
+  --warning-soft-row: rgba(214, 175, 91, 0.14);
+  --success-soft-row: rgba(96, 186, 128, 0.16);
+  --modified-soft-row: rgba(76, 154, 112, 0.14);
+  --patch-background: #f7fbff;
+  --row-border: rgba(108, 138, 168, 0.1);
+  --muted-row-background: rgba(83, 112, 138, 0.04);
+  --selected-row-background: rgba(72, 130, 196, 0.14);
+  --selected-row-shadow: inset 0 0 0 1px rgba(47, 127, 212, 0.18);
+  --backdrop-background: rgba(81, 101, 121, 0.28);
+  --dialog-background: linear-gradient(180deg, rgba(254, 255, 255, 0.98), rgba(244, 248, 252, 0.98));
+  --dialog-shadow: 0 18px 48px rgba(59, 84, 107, 0.18);
+  --modal-backdrop: rgba(81, 101, 121, 0.32);
+  --modal-shadow: 0 28px 64px rgba(59, 84, 107, 0.2);
+  --status-remote-bg: rgba(170, 184, 198, 0.3);
+  --status-remote-text: #53697d;
+  --status-remote-shadow: inset 0 0 0 1px rgba(126, 145, 165, 0.2);
+  --status-tag-bg: rgba(86, 172, 140, 0.16);
+  --status-tag-text: #21654b;
+  --status-tag-shadow: inset 0 0 0 1px rgba(70, 168, 132, 0.28);
+  --status-current-bg: rgba(225, 184, 110, 0.24);
+  --status-current-text: #7b4b09;
+  --status-current-shadow: inset 0 0 0 1px rgba(211, 156, 57, 0.38);
+  --status-local-bg: rgba(216, 169, 92, 0.18);
+  --status-local-text: #8d570d;
+  --status-local-shadow: inset 0 0 0 1px rgba(204, 146, 39, 0.28);
+  --selection-danger-background: linear-gradient(180deg, rgba(252, 240, 237, 0.98), rgba(248, 230, 225, 0.98));
+  --selection-danger-border: rgba(202, 121, 102, 0.42);
+  --selection-danger-shadow: inset 0 0 0 1px rgba(212, 133, 114, 0.16);
+  --selection-accent-background: linear-gradient(180deg, rgba(234, 244, 253, 0.98), rgba(224, 237, 249, 0.98));
+  --selection-accent-border: rgba(88, 150, 216, 0.48);
+  --selection-accent-shadow: inset 0 0 0 1px rgba(47, 127, 212, 0.12);
+  --scrollbar-track: rgba(222, 232, 240, 0.96);
+  --scrollbar-thumb: linear-gradient(180deg, rgba(139, 162, 184, 0.9), rgba(112, 137, 161, 0.94));
+  --scrollbar-thumb-hover: linear-gradient(180deg, rgba(122, 148, 172, 0.96), rgba(97, 124, 150, 0.98));
+  --scrollbar-thumb-active: linear-gradient(180deg, rgba(103, 132, 159, 0.98), rgba(85, 115, 143, 1));
+  --scrollbar-border: rgba(229, 237, 244, 0.92);
 }
 
 html,
@@ -25,6 +198,8 @@ body,
 body {
   min-height: 100vh;
   overflow: hidden;
+  color: inherit;
+  background: var(--app-background);
 }
 
 * {

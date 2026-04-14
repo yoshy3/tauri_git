@@ -4,11 +4,13 @@
 
   export let repository = null;
   export let loading = false;
+  export let theme = "dark";
   export let topActions = [];
   export let implementedActions = [];
   export let activeAction = "";
   export let onAction = () => {};
   export let onRefresh = () => {};
+  export let onToggleTheme = () => {};
 
   function actionKey(action) {
     return `topbar.${action.toLowerCase()}`;
@@ -34,6 +36,8 @@
     return 0;
   }
 
+  $: themeToggleLabel = theme === "dark" ? $_("topbar.switchToLight") : $_("topbar.switchToDark");
+  $: themeCaption = $_("topbar.theme");
 </script>
 
 <header class="topbar">
@@ -115,32 +119,63 @@
     </div>
 
     <div class="locale-area">
+      <span class="locale-label">{themeCaption}:</span>
+      <button
+        class="theme-toggle"
+        type="button"
+        on:click={onToggleTheme}
+        aria-label={themeToggleLabel}
+        title={themeToggleLabel}
+      >
+        <span class="button-icon" aria-hidden="true">
+          {#if theme === "dark"}
+            <svg class="theme-svg" viewBox="0 0 16 16" fill="none">
+              <circle cx="8" cy="8" r="3.2" />
+              <path d="M8 1.75v1.5" />
+              <path d="M8 12.75v1.5" />
+              <path d="M12.25 8h1.5" />
+              <path d="M2.25 8h1.5" />
+              <path d="m12.42 3.58-1.06 1.06" />
+              <path d="M4.64 11.36 3.58 12.42" />
+              <path d="m12.42 12.42-1.06-1.06" />
+              <path d="M4.64 4.64 3.58 3.58" />
+            </svg>
+          {:else}
+            <svg class="theme-svg" viewBox="0 0 16 16" fill="none">
+              <path d="M11.9 10.47A5.25 5.25 0 0 1 5.53 4.1 5.5 5.5 0 1 0 11.9 10.47Z" />
+            </svg>
+          {/if}
+        </span>
+      </button>
+    </div>
+
+    <div class="locale-area">
       <span class="locale-label">{$_("topbar.language")}:</span>
       <div class="locale-switcher" aria-label={$_("topbar.language")}>
-      <button
-        class:locale-active={$locale === "en"}
-        class="locale-button"
-        type="button"
-        on:click={() => setAppLocale("en")}
-        title="English"
-        aria-label="English"
-      >
-        <span class="button-icon" aria-hidden="true">
-          <span class="locale-glyph">A</span>
-        </span>
-      </button>
-      <button
-        class:locale-active={$locale === "ja"}
-        class="locale-button"
-        type="button"
-        on:click={() => setAppLocale("ja")}
-        title="日本語"
-        aria-label="日本語"
-      >
-        <span class="button-icon" aria-hidden="true">
-          <span class="locale-glyph locale-glyph-ja">日</span>
-        </span>
-      </button>
+        <button
+          class:locale-active={$locale === "en"}
+          class="locale-button"
+          type="button"
+          on:click={() => setAppLocale("en")}
+          title="English"
+          aria-label="English"
+        >
+          <span class="button-icon" aria-hidden="true">
+            <span class="locale-glyph">A</span>
+          </span>
+        </button>
+        <button
+          class:locale-active={$locale === "ja"}
+          class="locale-button"
+          type="button"
+          on:click={() => setAppLocale("ja")}
+          title="日本語"
+          aria-label="日本語"
+        >
+          <span class="button-icon" aria-hidden="true">
+            <span class="locale-glyph locale-glyph-ja">日</span>
+          </span>
+        </button>
       </div>
     </div>
   </div>
@@ -152,8 +187,8 @@
     justify-content: space-between;
     align-items: center;
     padding: 0 14px 0 10px;
-    border-bottom: 1px solid rgba(114, 144, 175, 0.1);
-    background: linear-gradient(180deg, rgba(6, 14, 23, 0.98), rgba(8, 17, 27, 0.93));
+    border-bottom: 1px solid var(--header-border);
+    background: var(--header-background);
     backdrop-filter: blur(20px);
     box-shadow: inset 0 -1px 0 rgba(255, 255, 255, 0.02);
   }
@@ -172,7 +207,7 @@
 
   .brand p {
     margin: 2px 0 0;
-    color: #6f859c;
+    color: var(--text-subtle);
     font-size: 0.75rem;
   }
 
@@ -182,7 +217,7 @@
     border-radius: 10px;
     display: grid;
     place-items: center;
-    background: linear-gradient(135deg, #1f5b94, #4ca4ff);
+    background: linear-gradient(135deg, var(--accent-strong), var(--accent));
     color: white;
     font-weight: 700;
     box-shadow: 0 8px 18px rgba(32, 108, 184, 0.28);
@@ -209,7 +244,7 @@
     gap: 7px;
     background: transparent;
     border: 0;
-    color: #8aa0b8;
+    color: var(--text-muted);
     text-transform: uppercase;
     letter-spacing: 0.08em;
     font-size: 0.72rem;
@@ -220,14 +255,14 @@
   }
 
   .toolbar-button:hover:enabled {
-    background: rgba(255, 255, 255, 0.03);
-    color: #dce8f4;
+    background: var(--hover-overlay-soft);
+    color: var(--text-secondary);
   }
 
   .toolbar-button.active {
-    color: #f2f7fb;
-    background: rgba(32, 84, 138, 0.22);
-    box-shadow: inset 0 -2px 0 #4da0ff;
+    color: var(--text-primary);
+    background: var(--accent-soft);
+    box-shadow: inset 0 -2px 0 var(--accent);
   }
 
   .locale-switcher {
@@ -235,8 +270,8 @@
     padding: 2px;
     gap: 2px;
     border-radius: 10px;
-    background: rgba(12, 23, 35, 0.8);
-    border: 1px solid rgba(120, 148, 177, 0.12);
+    background: var(--surface-background);
+    border: 1px solid var(--surface-border);
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.02);
   }
 
@@ -247,7 +282,7 @@
   }
 
   .locale-label {
-    color: #8aa0b8;
+    color: var(--text-muted);
     font-size: 0.74rem;
     font-weight: 600;
     letter-spacing: 0.04em;
@@ -261,7 +296,7 @@
     border: 0;
     border-radius: 8px;
     background: transparent;
-    color: #8aa0b8;
+    color: var(--text-muted);
     padding: 8px;
     font-size: 0.72rem;
     font-weight: 700;
@@ -269,14 +304,30 @@
   }
 
   .locale-button:hover {
-    background: rgba(255, 255, 255, 0.03);
-    color: #dce8f4;
+    background: var(--hover-overlay-soft);
+    color: var(--text-secondary);
   }
 
   .locale-button.locale-active {
-    background: rgba(32, 84, 138, 0.22);
-    color: #f2f7fb;
-    box-shadow: inset 0 -2px 0 #4da0ff;
+    background: var(--accent-soft);
+    color: var(--text-primary);
+    box-shadow: inset 0 -2px 0 var(--accent);
+  }
+
+  .theme-toggle {
+    display: inline-grid;
+    place-items: center;
+    width: 40px;
+    height: 40px;
+    border: 1px solid var(--surface-border);
+    border-radius: 10px;
+    background: var(--surface-background);
+    color: var(--text-secondary);
+    padding: 0;
+  }
+
+  .theme-toggle:hover {
+    background: var(--surface-background-hover);
   }
 
   .button-icon {
@@ -307,7 +358,8 @@
     text-align: center;
   }
 
-  .toolbar-svg {
+  .toolbar-svg,
+  .theme-svg {
     width: 22px;
     height: 22px;
     stroke: currentColor;
@@ -357,7 +409,7 @@
     font-weight: 800;
     line-height: 1;
     letter-spacing: 0;
-    box-shadow: 0 0 0 2px rgba(8, 17, 27, 0.92);
+    box-shadow: 0 0 0 2px var(--surface-background-strong);
     pointer-events: none;
   }
 
