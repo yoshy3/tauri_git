@@ -20,10 +20,12 @@ fn window_state_flags() -> tauri_plugin_window_state::StateFlags {
     let flags = tauri_plugin_window_state::StateFlags::all();
 
     #[cfg(target_os = "linux")]
-    flags.remove(tauri_plugin_window_state::StateFlags::MAXIMIZED);
-    flags.remove(tauri_plugin_window_state::StateFlags::FULLSCREEN);
-    flags.remove(tauri_plugin_window_state::StateFlags::DECORATIONS);
-    flags.remove(tauri_plugin_window_state::StateFlags::VISIBLE);
+    {
+        flags.remove(tauri_plugin_window_state::StateFlags::MAXIMIZED);
+        flags.remove(tauri_plugin_window_state::StateFlags::FULLSCREEN);
+        flags.remove(tauri_plugin_window_state::StateFlags::DECORATIONS);
+        flags.remove(tauri_plugin_window_state::StateFlags::VISIBLE);
+    }
 
     println!("window state flags: {flags:?}");
     flags
