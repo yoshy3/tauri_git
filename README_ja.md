@@ -151,3 +151,8 @@ src-tauri/  Tauri + Rust バックエンド
 ## ライセンス
 
 このプロジェクトは MIT License のもとで公開されています。詳細は [LICENSE](./LICENSE) を参照してください。
+
+## Compare View 注意
+
+- 通常のテキスト差分には対応しており、`git-crypt` 管理ファイルには compare view 用の専用フォールバックがあります。
+- `git-crypt` 以外の独自 `diff` / `filter` / `textconv` 設定は、現時点では compare view で未対応です。対象によっては差分を表示できません。

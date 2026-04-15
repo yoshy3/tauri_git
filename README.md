@@ -145,6 +145,8 @@ src-tauri/  Tauri + Rust backend
 - Some Git operations are implemented through the system `git` command for compatibility with familiar workflows.
 - The application currently targets a minimal desktop workflow rather than full parity with large Git GUI clients.
 - The side-by-side compare view is available from both commit details and the changes panel.
+- Standard text diffs are supported, and `git-crypt`-managed files have a dedicated fallback path for compare views.
+- Custom diff/filter/textconv setups other than `git-crypt` are not currently supported in compare views and may show no comparable diff.
 - Theme preference is persisted and restored automatically on the next launch.
 - Window size is persisted and restored automatically on the next launch. Window position restore is limited on Linux Wayland sessions.
 
