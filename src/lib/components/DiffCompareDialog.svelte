@@ -37,7 +37,9 @@
   }
 
   $: rows = parseUnifiedDiff(patchText);
-  $: if (open && rows.length > 0) {
+  $: hasComparableRows = rows.length > 0;
+  $: hasRawPatch = patchText.trim().length > 0;
+  $: if (open && hasComparableRows) {
     scrollToFirstChange();
   }
 </script>
@@ -69,12 +71,12 @@
         </div>
       </header>
 
-      <div class="diff-dialog-column-head">
-        <div>{$_("diffDialog.before")}</div>
-        <div>{$_("diffDialog.after")}</div>
-      </div>
+      {#if hasComparableRows}
+        <div class="diff-dialog-column-head">
+          <div>{$_("diffDialog.before")}</div>
+          <div>{$_("diffDialog.after")}</div>
+        </div>
 
-      {#if rows.length > 0}
         <div class="diff-dialog-body" bind:this={bodyElement}>
           {#each rows as row}
             {#if row.kind === "gap"}
@@ -113,6 +115,10 @@
               </div>
             {/if}
           {/each}
+        </div>
+      {:else if hasRawPatch}
+        <div class="diff-dialog-body diff-dialog-body-raw">
+          <pre class="diff-dialog-raw-patch">{patchText}</pre>
         </div>
       {:else}
         <div class="diff-dialog-empty">
@@ -232,6 +238,20 @@
   .diff-dialog-body {
     overflow: auto;
     background: var(--patch-background);
+  }
+
+  .diff-dialog-body-raw {
+    padding: 14px 18px 18px;
+  }
+
+  .diff-dialog-raw-patch {
+    margin: 0;
+    color: var(--text-secondary);
+    font-family: "SFMono-Regular", "Menlo", monospace;
+    font-size: 0.76rem;
+    line-height: 1.45;
+    white-space: pre-wrap;
+    word-break: break-word;
   }
 
   .diff-row {
