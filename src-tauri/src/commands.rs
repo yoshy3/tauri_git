@@ -11,7 +11,13 @@ where
 {
     tauri::async_runtime::spawn_blocking(job)
         .await
-        .map_err(|error| format!("繝舌ャ繧ｯ繧ｰ繝ｩ繧ｦ繝ｳ繝牙・逅・・螳溯｡後↓螟ｱ謨励＠縺ｾ縺励◆: {error}"))?
+        .map_err(|error| {
+            git::bilingual_with_detail(
+                "バックグラウンド処理の実行に失敗しました",
+                "Failed to run background task",
+                error,
+            )
+        })?
 }
 
 #[tauri::command]

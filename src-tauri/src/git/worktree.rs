@@ -2,32 +2,71 @@
 
 pub(crate) fn create_commit(repository: &Repository, message: &str) -> Result<(), String> {
     if message.trim().is_empty() {
-        return Err("コミットメッセージが空です。".to_string());
+        return Err(bilingual(
+            "コミットメッセージが空です。",
+            "Commit message is empty.",
+        ));
     }
 
     let mut index = repository
         .index()
-        .map_err(|error| format!("インデックスを開けませんでした: {}", error.message()))?;
+        .map_err(|error| {
+            bilingual_with_detail(
+                "インデックスを開けませんでした",
+                "Failed to open the index",
+                error.message(),
+            )
+        })?;
 
     index
         .add_all(["*"].iter(), git2::IndexAddOption::DEFAULT, None)
-        .map_err(|error| format!("変更をステージングできませんでした: {}", error.message()))?;
+        .map_err(|error| {
+            bilingual_with_detail(
+                "変更をステージングできませんでした",
+                "Failed to stage changes",
+                error.message(),
+            )
+        })?;
 
     index
         .write()
-        .map_err(|error| format!("インデックスを書き込めませんでした: {}", error.message()))?;
+        .map_err(|error| {
+            bilingual_with_detail(
+                "インデックスを書き込めませんでした",
+                "Failed to write the index",
+                error.message(),
+            )
+        })?;
 
     let tree_id = index
         .write_tree()
-        .map_err(|error| format!("ツリーを書き込めませんでした: {}", error.message()))?;
+        .map_err(|error| {
+            bilingual_with_detail(
+                "ツリーを書き込めませんでした",
+                "Failed to write the tree",
+                error.message(),
+            )
+        })?;
     let tree = repository
         .find_tree(tree_id)
-        .map_err(|error| format!("ツリーを読み込めませんでした: {}", error.message()))?;
+        .map_err(|error| {
+            bilingual_with_detail(
+                "ツリーを読み込めませんでした",
+                "Failed to load the tree",
+                error.message(),
+            )
+        })?;
 
     let signature = repository
         .signature()
         .or_else(|_| Signature::now("Tauri Git", "tauri-git@example.local"))
-        .map_err(|error| format!("コミット署名を作れませんでした: {}", error.message()))?;
+        .map_err(|error| {
+            bilingual_with_detail(
+                "コミット署名を作れませんでした",
+                "Failed to create the commit signature",
+                error.message(),
+            )
+        })?;
 
     let parent_commit = repository
         .head()
@@ -36,7 +75,10 @@ pub(crate) fn create_commit(repository: &Repository, message: &str) -> Result<()
         .and_then(|oid| repository.find_commit(oid).ok());
 
     if tree_is_unchanged(&tree, parent_commit.as_ref())? {
-        return Err("コミット対象の変更がありません。".to_string());
+        return Err(bilingual(
+            "コミット対象の変更がありません。",
+            "There are no changes to commit.",
+        ));
     }
 
     let parents: Vec<&git2::Commit<'_>> = parent_commit.iter().collect();
@@ -50,11 +92,23 @@ pub(crate) fn create_commit(repository: &Repository, message: &str) -> Result<()
             &tree,
             &parents,
         )
-        .map_err(|error| format!("コミットに失敗しました: {}", error.message()))?;
+        .map_err(|error| {
+            bilingual_with_detail(
+                "コミットに失敗しました",
+                "Commit failed",
+                error.message(),
+            )
+        })?;
 
     repository
         .checkout_head(None)
-        .map_err(|error| format!("作業ツリーを更新できませんでした: {}", error.message()))?;
+        .map_err(|error| {
+            bilingual_with_detail(
+                "作業ツリーを更新できませんでした",
+                "Failed to refresh the working tree",
+                error.message(),
+            )
+        })?;
 
     Ok(())
 }
@@ -75,15 +129,27 @@ pub(crate) fn create_stash(
 
     let statuses = repository
         .statuses(Some(&mut status_options))
-        .map_err(|error| format!("stash 対象を確認できませんでした: {}", error.message()))?;
+        .map_err(|error| {
+            bilingual_with_detail(
+                "stash 対象を確認できませんでした",
+                "Failed to inspect stash candidates",
+                error.message(),
+            )
+        })?;
 
     if statuses.is_empty() {
-        return Err("stash する変更がありません。".to_string());
+        return Err(bilingual(
+            "stash する変更がありません。",
+            "There are no changes to stash.",
+        ));
     }
     drop(statuses);
 
     if selected_paths.is_empty() {
-        return Err("stash 対象のファイルを選択してください。".to_string());
+        return Err(bilingual(
+            "stash 対象のファイルを選択してください。",
+            "Select at least one file to stash.",
+        ));
     }
 
     let repo_root = repository_root(repository)?;
@@ -108,20 +174,23 @@ pub(crate) fn create_stash(
 
     let output = command
         .output()
-        .map_err(|error| format!("stash コマンドを実行できませんでした: {}", error))?;
+        .map_err(|error| {
+            bilingual_with_detail(
+                "stash コマンドを実行できませんでした",
+                "Failed to run the stash command",
+                error,
+            )
+        })?;
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
         let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
-        let detail = if !stderr.is_empty() {
-            stderr
-        } else if !stdout.is_empty() {
-            stdout
-        } else {
-            "詳細なエラーを取得できませんでした。".to_string()
-        };
-
-        return Err(format!("stash に失敗しました: {detail}"));
+        let detail = command_output_detail(&stderr, &stdout);
+        return Err(bilingual_with_detail(
+            "stash に失敗しました",
+            "Stash failed",
+            detail,
+        ));
     }
 
     Ok(())
@@ -133,7 +202,10 @@ pub(crate) fn discard_selected_changes(
     selected_paths: &[String],
 ) -> Result<(), String> {
     if selected_paths.is_empty() {
-        return Err("discard する変更がありません。".to_string());
+        return Err(bilingual(
+            "discard する変更がありません。",
+            "There are no changes to discard.",
+        ));
     }
 
     let mut status_options = StatusOptions::new();
@@ -146,10 +218,19 @@ pub(crate) fn discard_selected_changes(
 
     let statuses = repository
         .statuses(Some(&mut status_options))
-        .map_err(|error| format!("discard 対象を確認できませんでした: {}", error.message()))?;
+        .map_err(|error| {
+            bilingual_with_detail(
+                "discard 対象を確認できませんでした",
+                "Failed to inspect discard candidates",
+                error.message(),
+            )
+        })?;
 
     if statuses.is_empty() {
-        return Err("discard できる変更がありません。".to_string());
+        return Err(bilingual(
+            "discard できる変更がありません。",
+            "There are no changes that can be discarded.",
+        ));
     }
 
     let selected_path_set = selected_paths
@@ -177,7 +258,10 @@ pub(crate) fn discard_selected_changes(
     }
 
     if restore_paths.is_empty() && remove_paths.is_empty() {
-        return Err("discard 対象のファイルを選択してください。".to_string());
+        return Err(bilingual(
+            "discard 対象のファイルを選択してください。",
+            "Select at least one file to discard.",
+        ));
     }
 
     let repo_root = repository_root(repository)?;
@@ -253,9 +337,16 @@ pub(crate) fn apply_stash_entry(repository: &mut Repository, index: usize) -> Re
             Ok(())
         }
         Err(error) if error.code() == git2::ErrorCode::NotFound => {
-            Err("適用できる stash がありません。".to_string())
+            Err(bilingual(
+                "適用できる stash がありません。",
+                "There is no stash entry that can be applied.",
+            ))
         }
-        Err(error) => Err(format!("stash apply に失敗しました: {}", error.message())),
+        Err(error) => Err(bilingual_with_detail(
+            "stash apply に失敗しました",
+            "stash apply failed",
+            error.message(),
+        )),
     }
 }
 
@@ -267,9 +358,16 @@ pub(crate) fn pop_stash_entry(repository: &mut Repository, index: usize) -> Resu
             Ok(())
         }
         Err(error) if error.code() == git2::ErrorCode::NotFound => {
-            Err("適用できる stash がありません。".to_string())
+            Err(bilingual(
+                "適用できる stash がありません。",
+                "There is no stash entry that can be popped.",
+            ))
         }
-        Err(error) => Err(format!("stash pop に失敗しました: {}", error.message())),
+        Err(error) => Err(bilingual_with_detail(
+            "stash pop に失敗しました",
+            "stash pop failed",
+            error.message(),
+        )),
     }
 }
 
@@ -277,30 +375,51 @@ pub(crate) fn pop_stash_entry(repository: &mut Repository, index: usize) -> Resu
 fn reset_index_to_head(repository: &Repository) -> Result<(), String> {
     let mut index = repository
         .index()
-        .map_err(|error| format!("インデックスを開けませんでした: {}", error.message()))?;
+        .map_err(|error| {
+            bilingual_with_detail(
+                "インデックスを開けませんでした",
+                "Failed to open the index",
+                error.message(),
+            )
+        })?;
 
     if let Ok(head) = repository.head() {
         if let Ok(tree) = head.peel_to_tree() {
             index.read_tree(&tree).map_err(|error| {
-                format!(
-                    "インデックスを HEAD に戻せませんでした: {}",
-                    error.message()
+                bilingual_with_detail(
+                    "インデックスを HEAD に戻せませんでした",
+                    "Failed to restore the index to HEAD",
+                    error.message(),
                 )
             })?;
         } else {
             index.clear().map_err(|error| {
-                format!("インデックスを初期化できませんでした: {}", error.message())
+                bilingual_with_detail(
+                    "インデックスを初期化できませんでした",
+                    "Failed to clear the index",
+                    error.message(),
+                )
             })?;
         }
     } else {
         index.clear().map_err(|error| {
-            format!("インデックスを初期化できませんでした: {}", error.message())
+            bilingual_with_detail(
+                "インデックスを初期化できませんでした",
+                "Failed to clear the index",
+                error.message(),
+            )
         })?;
     }
 
     index
         .write()
-        .map_err(|error| format!("インデックスを書き込めませんでした: {}", error.message()))?;
+        .map_err(|error| {
+            bilingual_with_detail(
+                "インデックスを書き込めませんでした",
+                "Failed to write the index",
+                error.message(),
+            )
+        })?;
 
     Ok(())
 }

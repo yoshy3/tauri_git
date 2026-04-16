@@ -19,7 +19,13 @@ pub(crate) fn build_repository_status(repository: &mut Repository) -> Result<Git
 
     let statuses = repository
         .statuses(Some(&mut status_options))
-        .map_err(|error| format!("ステータスを取得できませんでした: {}", error.message()))?;
+        .map_err(|error| {
+            bilingual_with_detail(
+                "ステータスを取得できませんでした",
+                "Failed to load repository status",
+                error.message(),
+            )
+        })?;
 
     let mut entries = Vec::new();
 
@@ -75,7 +81,13 @@ pub(crate) fn build_repository_status(repository: &mut Repository) -> Result<Git
         .map(|branch_name| {
             repository
                 .find_branch(branch_name, git2::BranchType::Local)
-                .map_err(|error| format!("current branch could not be loaded: {}", error.message()))
+                .map_err(|error| {
+                    bilingual_with_detail(
+                        "現在のブランチ情報を読み込めませんでした",
+                        "Failed to load the current branch",
+                        error.message(),
+                    )
+                })
                 .and_then(|branch| load_branch_upstream_name(&branch))
         })
         .transpose()?
@@ -131,15 +143,22 @@ fn build_history_revision(repository: &Repository) -> Result<String, String> {
     }
 
     let references = repository.references().map_err(|error| {
-        format!(
-            "履歴リビジョン情報を取得できませんでした: {}",
-            error.message()
+        bilingual_with_detail(
+            "履歴リビジョン情報を取得できませんでした",
+            "Failed to load history revision information",
+            error.message(),
         )
     })?;
 
     for reference_result in references {
         let reference = reference_result
-            .map_err(|error| format!("参照情報を読み込めませんでした: {}", error.message()))?;
+            .map_err(|error| {
+                bilingual_with_detail(
+                    "参照情報を読み込めませんでした",
+                    "Failed to load reference information",
+                    error.message(),
+                )
+            })?;
         let Some(name) = reference.name() else {
             continue;
         };
@@ -201,16 +220,34 @@ fn worktree_status_code(status: Status) -> char {
 fn load_local_branch_syncs(repository: &Repository) -> Result<Vec<GitLocalBranchSync>, String> {
     let branches = repository
         .branches(Some(git2::BranchType::Local))
-        .map_err(|error| format!("ブランチ一覧を取得できませんでした: {}", error.message()))?;
+        .map_err(|error| {
+            bilingual_with_detail(
+                "ブランチ一覧を取得できませんでした",
+                "Failed to load local branches",
+                error.message(),
+            )
+        })?;
 
     let mut syncs = Vec::new();
 
     for branch_result in branches {
         let (branch, _) = branch_result
-            .map_err(|error| format!("ブランチ情報を読み込めませんでした: {}", error.message()))?;
+            .map_err(|error| {
+                bilingual_with_detail(
+                    "ブランチ情報を読み込めませんでした",
+                    "Failed to read branch information",
+                    error.message(),
+                )
+            })?;
         if let Some(name) = branch
             .name()
-            .map_err(|error| format!("ブランチ名を取得できませんでした: {}", error.message()))?
+            .map_err(|error| {
+                bilingual_with_detail(
+                    "ブランチ名を取得できませんでした",
+                    "Failed to read the branch name",
+                    error.message(),
+                )
+            })?
         {
             let (ahead_count, behind_count) =
                 load_branch_upstream_sync_counts(repository, &branch)?;
@@ -231,9 +268,10 @@ fn load_remote_groups(repository: &Repository) -> Result<Vec<GitRemoteGroup>, St
     let branches = repository
         .branches(Some(git2::BranchType::Remote))
         .map_err(|error| {
-            format!(
-                "リモートブランチ一覧を取得できませんでした: {}",
-                error.message()
+            bilingual_with_detail(
+                "リモートブランチ一覧を取得できませんでした",
+                "Failed to load remote branches",
+                error.message(),
             )
         })?;
 
@@ -241,15 +279,17 @@ fn load_remote_groups(repository: &Repository) -> Result<Vec<GitRemoteGroup>, St
 
     for branch_result in branches {
         let (branch, _) = branch_result.map_err(|error| {
-            format!(
-                "リモートブランチ情報を読み込めませんでした: {}",
-                error.message()
+            bilingual_with_detail(
+                "リモートブランチ情報を読み込めませんでした",
+                "Failed to read remote branch information",
+                error.message(),
             )
         })?;
         let Some(name) = branch.name().map_err(|error| {
-            format!(
-                "リモートブランチ名を取得できませんでした: {}",
-                error.message()
+            bilingual_with_detail(
+                "リモートブランチ名を取得できませんでした",
+                "Failed to read the remote branch name",
+                error.message(),
             )
         })?
         else {
@@ -284,7 +324,13 @@ fn load_remote_groups(repository: &Repository) -> Result<Vec<GitRemoteGroup>, St
 fn load_tags(repository: &Repository) -> Result<Vec<String>, String> {
     let tag_names = repository
         .tag_names(None)
-        .map_err(|error| format!("タグ一覧を取得できませんでした: {}", error.message()))?;
+        .map_err(|error| {
+            bilingual_with_detail(
+                "タグ一覧を取得できませんでした",
+                "Failed to load tags",
+                error.message(),
+            )
+        })?;
 
     let mut tags = tag_names
         .iter()
@@ -300,7 +346,13 @@ fn load_tags(repository: &Repository) -> Result<Vec<String>, String> {
 fn load_submodules(repository: &Repository) -> Result<Vec<GitSubmoduleEntry>, String> {
     let submodules = repository
         .submodules()
-        .map_err(|error| format!("submodule 一覧を取得できませんでした: {}", error.message()))?;
+        .map_err(|error| {
+            bilingual_with_detail(
+                "submodule 一覧を取得できませんでした",
+                "Failed to load submodules",
+                error.message(),
+            )
+        })?;
 
     let mut entries = submodules
         .into_iter()

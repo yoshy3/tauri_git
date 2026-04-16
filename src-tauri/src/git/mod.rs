@@ -9,6 +9,7 @@ use git2::{
     Status, StatusOptions,
 };
 use std::collections::{BTreeMap, HashMap};
+use std::fmt::Display;
 use std::fs;
 use std::io::Write;
 #[cfg(windows)]
@@ -58,4 +59,29 @@ struct PushTarget {
     remote_name: String,
     remote_branch_name: String,
     set_upstream: bool,
+}
+
+pub(crate) fn bilingual(ja: impl Into<String>, en: impl Into<String>) -> String {
+    format!("{} / {}", ja.into(), en.into())
+}
+
+pub(crate) fn bilingual_with_detail(
+    ja: impl Into<String>,
+    en: impl Into<String>,
+    detail: impl Display,
+) -> String {
+    format!("{} / {}: {}", ja.into(), en.into(), detail)
+}
+
+fn command_output_detail(stderr: &str, stdout: &str) -> String {
+    if !stderr.is_empty() {
+        stderr.to_string()
+    } else if !stdout.is_empty() {
+        stdout.to_string()
+    } else {
+        bilingual(
+            "詳細なエラー情報はありません。",
+            "No detailed error output was available.",
+        )
+    }
 }

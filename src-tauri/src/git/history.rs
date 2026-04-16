@@ -13,12 +13,24 @@ pub(crate) fn load_commit_history_chunk(
     let reference_labels = load_reference_labels(repository, current_branch_name.as_deref())?;
     let mut revwalk = repository
         .revwalk()
-        .map_err(|error| format!("コミット履歴を読み込めませんでした: {}", error.message()))?;
+        .map_err(|error| {
+            bilingual_with_detail(
+                "コミット履歴を読み込めませんでした",
+                "Failed to load commit history",
+                error.message(),
+            )
+        })?;
 
     push_history_refs(repository, &mut revwalk)?;
     revwalk
         .set_sorting(git2::Sort::TOPOLOGICAL)
-        .map_err(|error| format!("コミット履歴の並び替えに失敗しました: {}", error.message()))?;
+        .map_err(|error| {
+            bilingual_with_detail(
+                "コミット履歴の並び替えに失敗しました",
+                "Failed to sort commit history",
+                error.message(),
+            )
+        })?;
 
     let mut commits = Vec::new();
     let mut has_more = false;
@@ -34,10 +46,22 @@ pub(crate) fn load_commit_history_chunk(
         }
 
         let oid = oid_result
-            .map_err(|error| format!("コミット ID を取得できませんでした: {}", error.message()))?;
+            .map_err(|error| {
+                bilingual_with_detail(
+                    "コミット ID を取得できませんでした",
+                    "Failed to read the commit ID",
+                    error.message(),
+                )
+            })?;
         let commit = repository
             .find_commit(oid)
-            .map_err(|error| format!("コミットを読み込めませんでした: {}", error.message()))?;
+            .map_err(|error| {
+                bilingual_with_detail(
+                    "コミットを読み込めませんでした",
+                    "Failed to load the commit",
+                    error.message(),
+                )
+            })?;
 
         let timestamp = commit.time().seconds();
         let committed_at = chrono::DateTime::from_timestamp(timestamp, 0)
@@ -82,10 +106,22 @@ pub(crate) fn load_commit_detail(repository: &Repository, oid: &str) -> Result<G
         .and_then(|head| head.shorthand().map(ToOwned::to_owned));
     let reference_labels = load_reference_labels(repository, current_branch_name.as_deref())?;
     let oid = Oid::from_str(oid)
-        .map_err(|error| format!("コミット ID が不正です: {}", error.message()))?;
+        .map_err(|error| {
+            bilingual_with_detail(
+                "コミット ID が不正です",
+                "The commit ID is invalid",
+                error.message(),
+            )
+        })?;
     let commit = repository
         .find_commit(oid)
-        .map_err(|error| format!("コミットを読み込めませんでした: {}", error.message()))?;
+        .map_err(|error| {
+            bilingual_with_detail(
+                "コミットを読み込めませんでした",
+                "Failed to load the commit",
+                error.message(),
+            )
+        })?;
 
     let files = load_commit_file_diffs(repository, &commit)?;
 
@@ -144,16 +180,23 @@ fn load_commit_file_diffs(
 ) -> Result<Vec<GitCommitFileDiff>, String> {
     let commit_tree = commit
         .tree()
-        .map_err(|error| format!("コミットツリーを取得できませんでした: {}", error.message()))?;
+        .map_err(|error| {
+            bilingual_with_detail(
+                "コミットツリーを取得できませんでした",
+                "Failed to read the commit tree",
+                error.message(),
+            )
+        })?;
     let parent_tree = if commit.parent_count() > 0 {
         Some(
             commit
                 .parent(0)
                 .and_then(|parent| parent.tree())
                 .map_err(|error| {
-                    format!(
-                        "親コミットのツリーを取得できませんでした: {}",
-                        error.message()
+                    bilingual_with_detail(
+                        "親コミットのツリーを取得できませんでした",
+                        "Failed to read the parent commit tree",
+                        error.message(),
                     )
                 })?,
         )
@@ -174,7 +217,13 @@ fn load_commit_file_diffs(
             Some(&commit_tree),
             Some(&mut diff_options),
         )
-        .map_err(|error| format!("コミット差分を読み込めませんでした: {}", error.message()))?;
+        .map_err(|error| {
+            bilingual_with_detail(
+                "コミット差分を読み込めませんでした",
+                "Failed to load the commit diff",
+                error.message(),
+            )
+        })?;
 
     let mut files = diff
         .deltas()
@@ -210,7 +259,13 @@ fn load_commit_file_diffs(
         }
         true
     })
-    .map_err(|error| format!("コミットパッチを読み込めませんでした: {}", error.message()))?;
+    .map_err(|error| {
+        bilingual_with_detail(
+            "コミットパッチを読み込めませんでした",
+            "Failed to load the commit patch",
+            error.message(),
+        )
+    })?;
 
     maybe_fill_git_crypt_commit_patches(
         repository,

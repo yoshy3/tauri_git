@@ -12,7 +12,13 @@ pub(super) fn git_command() -> Command {
 pub(super) fn run_git_command(mut command: Command, action_name: &str) -> Result<(), String> {
     let output = command
         .output()
-        .map_err(|error| format!("{action_name} コマンドを実行できませんでした: {}", error))?;
+        .map_err(|error| {
+            bilingual_with_detail(
+                format!("{action_name} を実行できませんでした"),
+                format!("Failed to run {action_name}"),
+                error,
+            )
+        })?;
 
     if output.status.success() {
         return Ok(());
@@ -20,37 +26,37 @@ pub(super) fn run_git_command(mut command: Command, action_name: &str) -> Result
 
     let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
     let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
-    let detail = if !stderr.is_empty() {
-        stderr
-    } else if !stdout.is_empty() {
-        stdout
-    } else {
-        "詳細なエラーを取得できませんでした。".to_string()
-    };
-
-    Err(format!("{action_name} に失敗しました: {detail}"))
+    let detail = command_output_detail(&stderr, &stdout);
+    Err(bilingual_with_detail(
+        format!("{action_name} に失敗しました"),
+        format!("{action_name} failed"),
+        detail,
+    ))
 }
 
 
 fn run_git_diff_command(mut command: Command, action_name: &str) -> Result<String, String> {
     let output = command
         .output()
-        .map_err(|error| format!("{action_name} コマンドを実行できませんでした: {}", error))?;
+        .map_err(|error| {
+            bilingual_with_detail(
+                format!("{action_name} を実行できませんでした"),
+                format!("Failed to run {action_name}"),
+                error,
+            )
+        })?;
 
     match output.status.code() {
         Some(0) | Some(1) => Ok(String::from_utf8_lossy(&output.stdout).to_string()),
         _ => {
             let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
             let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
-            let detail = if !stderr.is_empty() {
-                stderr
-            } else if !stdout.is_empty() {
-                stdout
-            } else {
-                "詳細なエラーを取得できませんでした。".to_string()
-            };
-
-            Err(format!("{action_name} に失敗しました: {detail}"))
+            let detail = command_output_detail(&stderr, &stdout);
+            Err(bilingual_with_detail(
+                format!("{action_name} に失敗しました"),
+                format!("{action_name} failed"),
+                detail,
+            ))
         }
     }
 }
@@ -144,7 +150,12 @@ fn run_filter_command(
     let parts = split_command_line(command_line);
     let executable = parts
         .first()
-        .ok_or_else(|| format!("{action_name} command is empty"))?;
+        .ok_or_else(|| {
+            bilingual(
+                format!("{action_name} のコマンド文字列が空です。"),
+                format!("The command line for {action_name} is empty."),
+            )
+        })?;
 
     let mut command = Command::new(executable);
     #[cfg(windows)]
@@ -161,17 +172,35 @@ fn run_filter_command(
 
     let mut child = command
         .spawn()
-        .map_err(|error| format!("{action_name} process could not be started: {error}"))?;
+        .map_err(|error| {
+            bilingual_with_detail(
+                format!("{action_name} プロセスを開始できませんでした"),
+                format!("Failed to start the {action_name} process"),
+                error,
+            )
+        })?;
 
     if let Some(stdin) = child.stdin.as_mut() {
         stdin
             .write_all(input)
-            .map_err(|error| format!("{action_name} input could not be written: {error}"))?;
+            .map_err(|error| {
+                bilingual_with_detail(
+                    format!("{action_name} への入力を書き込めませんでした"),
+                    format!("Failed to write input to {action_name}"),
+                    error,
+                )
+            })?;
     }
 
     let output = child
         .wait_with_output()
-        .map_err(|error| format!("{action_name} result could not be read: {error}"))?;
+        .map_err(|error| {
+            bilingual_with_detail(
+                format!("{action_name} の結果を読み取れませんでした"),
+                format!("Failed to read the result of {action_name}"),
+                error,
+            )
+        })?;
 
     if output.status.success() {
         return Ok(output.stdout);
@@ -179,15 +208,12 @@ fn run_filter_command(
 
     let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
     let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
-    let detail = if !stderr.is_empty() {
-        stderr
-    } else if !stdout.is_empty() {
-        stdout
-    } else {
-        "unknown error".to_string()
-    };
-
-    Err(format!("{action_name} failed: {detail}"))
+    let detail = command_output_detail(&stderr, &stdout);
+    Err(bilingual_with_detail(
+        format!("{action_name} に失敗しました"),
+        format!("{action_name} failed"),
+        detail,
+    ))
 }
 
 
@@ -199,7 +225,13 @@ fn maybe_build_git_crypt_diff(
 ) -> Result<Option<String>, String> {
     let config = repository
         .config()
-        .map_err(|error| format!("failed to inspect git config: {}", error.message()))?;
+        .map_err(|error| {
+            bilingual_with_detail(
+                "git config を確認できませんでした",
+                "Failed to inspect git config",
+                error.message(),
+            )
+        })?;
     let smudge_command = match config.get_string("filter.git-crypt.smudge") {
         Ok(value) => value,
         Err(_) => return Ok(None),
@@ -207,7 +239,13 @@ fn maybe_build_git_crypt_diff(
 
     let worktree_path = repo_root.join(file_path);
     let new_bytes = fs::read(&worktree_path)
-        .map_err(|error| format!("failed to read worktree file {}: {}", worktree_path.display(), error))?;
+        .map_err(|error| {
+            bilingual_with_detail(
+                format!("作業ツリーファイルを読み込めませんでした ({})", worktree_path.display()),
+                format!("Failed to read worktree file ({})", worktree_path.display()),
+                error,
+            )
+        })?;
 
     let old_bytes = if include_head {
         let head = match repository.head() {
@@ -222,16 +260,22 @@ fn maybe_build_git_crypt_diff(
             Ok(entry) => entry,
             Err(error) if error.code() == git2::ErrorCode::NotFound => return Ok(None),
             Err(error) => {
-                return Err(format!(
-                    "failed to resolve HEAD entry for {}: {}",
-                    file_path,
-                    error.message()
+                return Err(bilingual_with_detail(
+                    format!("HEAD 内のエントリを解決できませんでした ({file_path})"),
+                    format!("Failed to resolve the HEAD entry ({file_path})"),
+                    error.message(),
                 ))
             }
         };
         let blob = repository
             .find_blob(entry.id())
-            .map_err(|error| format!("failed to read HEAD blob for {}: {}", file_path, error.message()))?;
+            .map_err(|error| {
+                bilingual_with_detail(
+                    format!("HEAD blob を読み込めませんでした ({file_path})"),
+                    format!("Failed to read the HEAD blob ({file_path})"),
+                    error.message(),
+                )
+            })?;
         Some(
             run_filter_command(repo_root, &smudge_command, blob.content(), "git-crypt smudge")?,
         )
@@ -266,17 +310,23 @@ fn load_tree_entry_plaintext(
         Ok(entry) => entry,
         Err(error) if error.code() == git2::ErrorCode::NotFound => return Ok(None),
         Err(error) => {
-            return Err(format!(
-                "failed to resolve tree entry for {}: {}",
-                file_path,
-                error.message()
+            return Err(bilingual_with_detail(
+                format!("ツリーエントリを解決できませんでした ({file_path})"),
+                format!("Failed to resolve the tree entry ({file_path})"),
+                error.message(),
             ))
         }
     };
 
     let blob = repository
         .find_blob(entry.id())
-        .map_err(|error| format!("failed to read blob for {}: {}", file_path, error.message()))?;
+        .map_err(|error| {
+            bilingual_with_detail(
+                format!("blob を読み込めませんでした ({file_path})"),
+                format!("Failed to read the blob ({file_path})"),
+                error.message(),
+            )
+        })?;
     let plaintext = run_filter_command(repo_root, smudge_command, blob.content(), "git-crypt smudge")?;
     Ok(Some(String::from_utf8_lossy(&plaintext).to_string()))
 }
@@ -294,7 +344,13 @@ pub(super) fn maybe_fill_git_crypt_commit_patches(
 
     let config = repository
         .config()
-        .map_err(|error| format!("failed to inspect git config: {}", error.message()))?;
+        .map_err(|error| {
+            bilingual_with_detail(
+                "git config を確認できませんでした",
+                "Failed to inspect git config",
+                error.message(),
+            )
+        })?;
     let smudge_command = match config.get_string("filter.git-crypt.smudge") {
         Ok(value) => value,
         Err(_) => return Ok(()),
@@ -415,10 +471,10 @@ impl RepositoryHeadExt for Repository {
         match tree.get_path(std::path::Path::new(path)) {
             Ok(_) => Ok(true),
             Err(error) if error.code() == git2::ErrorCode::NotFound => Ok(false),
-            Err(error) => Err(format!(
-                "HEAD tree lookup failed for {}: {}",
-                path,
-                error.message()
+            Err(error) => Err(bilingual_with_detail(
+                format!("HEAD ツリーの参照に失敗しました ({path})"),
+                format!("HEAD tree lookup failed ({path})"),
+                error.message(),
             )),
         }
     }

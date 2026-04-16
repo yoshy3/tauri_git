@@ -21,9 +21,10 @@ pub(super) fn load_branch_upstream_sync_counts(
     repository
         .graph_ahead_behind(local_oid, upstream_oid)
         .map_err(|error| {
-            format!(
-                "upstream との差分を取得できませんでした: {}",
-                error.message()
+            bilingual_with_detail(
+                "upstream との差分を取得できませんでした",
+                "Failed to read ahead/behind counts for the upstream branch",
+                error.message(),
             )
         })
 }
@@ -48,9 +49,10 @@ pub(super) fn load_branch_upstream_name(branch: &git2::Branch<'_>) -> Result<Opt
         .name()
         .map(|name| name.map(ToOwned::to_owned))
         .map_err(|error| {
-            format!(
-                "upstream branch name could not be read: {}",
-                error.message()
+            bilingual_with_detail(
+                "upstream ブランチ名を取得できませんでした",
+                "Failed to read the upstream branch name",
+                error.message(),
             )
         })
 }
@@ -63,7 +65,7 @@ pub(crate) fn checkout_repository_branch(
 ) -> Result<(), String> {
     let branch_name = branch_name.trim();
     if branch_name.is_empty() {
-        return Err("branch name is empty".to_string());
+        return Err(bilingual("ブランチ名が空です。", "Branch name is empty."));
     }
 
     let current_branch = repository
@@ -104,20 +106,23 @@ pub(crate) fn checkout_repository_branch(
 
     let output = command
         .output()
-        .map_err(|error| format!("Failed to run git checkout: {}", error))?;
+        .map_err(|error| {
+            bilingual_with_detail(
+                "git checkout を実行できませんでした",
+                "Failed to run git checkout",
+                error,
+            )
+        })?;
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
         let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
-        let detail = if !stderr.is_empty() {
-            stderr
-        } else if !stdout.is_empty() {
-            stdout
-        } else {
-            "git checkout failed without output".to_string()
-        };
-
-        return Err(format!("git checkout failed: {detail}"));
+        let detail = command_output_detail(&stderr, &stdout);
+        return Err(bilingual_with_detail(
+            "git checkout に失敗しました",
+            "git checkout failed",
+            detail,
+        ));
     }
 
     Ok(())
@@ -134,23 +139,33 @@ pub(crate) fn create_branch_from_source(
 ) -> Result<(), String> {
     let branch_name = branch_name.trim();
     if branch_name.is_empty() {
-        return Err("branch name is empty".to_string());
+        return Err(bilingual("ブランチ名が空です。", "Branch name is empty."));
     }
 
     let source_name = source_name.trim();
     if source_name.is_empty() {
-        return Err("branch source is empty".to_string());
+        return Err(bilingual("ブランチ元が空です。", "Branch source is empty."));
     }
 
     let source_ref = match source_kind {
         "remote_branch" => {
             let remote_name = source_remote_name
                 .filter(|name| !name.trim().is_empty())
-                .ok_or_else(|| "remote source is missing its remote name".to_string())?;
+                .ok_or_else(|| {
+                    bilingual(
+                        "リモート元の名前が指定されていません。",
+                        "The remote source name is missing.",
+                    )
+                })?;
             format!("{remote_name}/{source_name}")
         }
         "local_branch" | "tag" => source_name.to_string(),
-        _ => return Err(format!("unsupported branch source kind: {source_kind}")),
+        _ => {
+            return Err(bilingual(
+                format!("未対応のブランチ元種別です: {source_kind}"),
+                format!("Unsupported branch source kind: {source_kind}"),
+            ))
+        }
     };
 
     let repo_root = repository_root(repository)?;
@@ -184,20 +199,23 @@ pub(crate) fn create_branch_from_source(
 
     let output = command
         .output()
-        .map_err(|error| format!("Failed to run git branch creation: {}", error))?;
+        .map_err(|error| {
+            bilingual_with_detail(
+                "ブランチ作成コマンドを実行できませんでした",
+                "Failed to run branch creation command",
+                error,
+            )
+        })?;
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
         let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
-        let detail = if !stderr.is_empty() {
-            stderr
-        } else if !stdout.is_empty() {
-            stdout
-        } else {
-            "git branch creation failed without output".to_string()
-        };
-
-        return Err(format!("git branch creation failed: {detail}"));
+        let detail = command_output_detail(&stderr, &stdout);
+        return Err(bilingual_with_detail(
+            "ブランチ作成に失敗しました",
+            "Branch creation failed",
+            detail,
+        ));
     }
 
     Ok(())
@@ -213,7 +231,7 @@ pub(crate) fn delete_repository_branch(
 ) -> Result<(), String> {
     let branch_name = branch_name.trim();
     if branch_name.is_empty() {
-        return Err("branch name is empty".to_string());
+        return Err(bilingual("ブランチ名が空です。", "Branch name is empty."));
     }
 
     let repo_root = repository_root(repository)?;
@@ -227,7 +245,10 @@ pub(crate) fn delete_repository_branch(
                 .ok()
                 .and_then(|head| head.shorthand().map(ToOwned::to_owned));
             if current_branch.as_deref() == Some(branch_name) {
-                return Err("cannot delete the currently checked out branch".to_string());
+                return Err(bilingual(
+                    "現在 checkout 中のブランチは削除できません。",
+                    "Cannot delete the currently checked out branch.",
+                ));
             }
 
             command
@@ -238,7 +259,12 @@ pub(crate) fn delete_repository_branch(
         "remote_branch" => {
             let remote_name = remote_name
                 .filter(|name| !name.trim().is_empty())
-                .ok_or_else(|| "remote branch delete requires a remote name".to_string())?;
+                .ok_or_else(|| {
+                    bilingual(
+                        "リモートブランチ削除にはリモート名が必要です。",
+                        "Deleting a remote branch requires a remote name.",
+                    )
+                })?;
 
             command
                 .arg("push")
@@ -246,25 +272,33 @@ pub(crate) fn delete_repository_branch(
                 .arg("--delete")
                 .arg(branch_name);
         }
-        _ => return Err(format!("unsupported branch delete kind: {branch_kind}")),
+        _ => {
+            return Err(bilingual(
+                format!("未対応のブランチ削除種別です: {branch_kind}"),
+                format!("Unsupported branch delete kind: {branch_kind}"),
+            ))
+        }
     }
 
     let output = command
         .output()
-        .map_err(|error| format!("Failed to run git branch delete: {}", error))?;
+        .map_err(|error| {
+            bilingual_with_detail(
+                "ブランチ削除コマンドを実行できませんでした",
+                "Failed to run branch delete command",
+                error,
+            )
+        })?;
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
         let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
-        let detail = if !stderr.is_empty() {
-            stderr
-        } else if !stdout.is_empty() {
-            stdout
-        } else {
-            "git branch delete failed without output".to_string()
-        };
-
-        return Err(format!("git branch delete failed: {detail}"));
+        let detail = command_output_detail(&stderr, &stdout);
+        return Err(bilingual_with_detail(
+            "ブランチ削除に失敗しました",
+            "Branch deletion failed",
+            detail,
+        ));
     }
 
     Ok(())

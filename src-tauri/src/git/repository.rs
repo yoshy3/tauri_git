@@ -3,10 +3,10 @@
 pub(crate) fn open_repo(path: &str) -> Result<Repository, String> {
     let normalized = PathBuf::from(path);
     Repository::discover(&normalized).map_err(|error| {
-        format!(
-            "Git リポジトリを開けませんでした: {} ({})",
-            normalized.display(),
-            error.message()
+        bilingual_with_detail(
+            format!("Git リポジトリを開けませんでした ({})", normalized.display()),
+            format!("Failed to open Git repository ({})", normalized.display()),
+            error.message(),
         )
     })
 }
@@ -16,7 +16,12 @@ pub(super) fn repository_root(repository: &Repository) -> Result<PathBuf, String
     repository
         .workdir()
         .or_else(|| repository.path().parent())
-        .ok_or_else(|| "リポジトリのルートパスを解決できませんでした。".to_string())
+        .ok_or_else(|| {
+            bilingual(
+                "リポジトリのルートパスを解決できませんでした。",
+                "Failed to resolve the repository root path.",
+            )
+        })
         .map(|path| path.to_path_buf())
 }
 
@@ -30,9 +35,10 @@ pub(super) fn tree_is_unchanged(
     };
 
     let parent_tree = parent_commit.tree().map_err(|error| {
-        format!(
-            "親コミットのツリーを取得できませんでした: {}",
-            error.message()
+        bilingual_with_detail(
+            "親コミットのツリーを取得できませんでした",
+            "Failed to read the parent commit tree",
+            error.message(),
         )
     })?;
 

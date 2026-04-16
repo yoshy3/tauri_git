@@ -57,20 +57,20 @@ fn append_reference_labels(
         Ok(references) => references,
         Err(error) if error.code() == git2::ErrorCode::NotFound => return Ok(()),
         Err(error) => {
-            return Err(format!(
-                "参照 {} を読み込めませんでした: {}",
-                pattern,
-                error.message()
+            return Err(bilingual_with_detail(
+                format!("参照を読み込めませんでした ({pattern})"),
+                format!("Failed to load references ({pattern})"),
+                error.message(),
             ))
         }
     };
 
     for reference_result in references {
         let reference = reference_result.map_err(|error| {
-            format!(
-                "参照 {} の読み込みに失敗しました: {}",
-                pattern,
-                error.message()
+            bilingual_with_detail(
+                format!("参照の読み込みに失敗しました ({pattern})"),
+                format!("Failed to read a reference ({pattern})"),
+                error.message(),
             )
         })?;
         let Ok(commit) = reference.peel_to_commit() else {
@@ -111,10 +111,10 @@ pub(super) fn push_history_refs(
             Ok(()) => pushed_any = true,
             Err(error) if error.code() == git2::ErrorCode::NotFound => {}
             Err(error) => {
-                return Err(format!(
-                    "履歴参照 {} を追加できませんでした: {}",
-                    pattern,
-                    error.message()
+                return Err(bilingual_with_detail(
+                    format!("履歴参照を追加できませんでした ({pattern})"),
+                    format!("Failed to add history references ({pattern})"),
+                    error.message(),
                 ))
             }
         }
@@ -125,9 +125,10 @@ pub(super) fn push_history_refs(
             Ok(references) => Some(references),
             Err(error) if error.code() == git2::ErrorCode::NotFound => None,
             Err(error) => {
-                return Err(format!(
-                    "タグ参照を読み込めませんでした: {}",
-                    error.message()
+                return Err(bilingual_with_detail(
+                    "タグ参照を読み込めませんでした",
+                    "Failed to load tag references",
+                    error.message(),
                 ))
             }
         };
@@ -135,16 +136,20 @@ pub(super) fn push_history_refs(
         if let Some(references) = references {
             for reference_result in references {
                 let reference = reference_result.map_err(|error| {
-                    format!("タグ参照の読み込みに失敗しました: {}", error.message())
+                    bilingual_with_detail(
+                        "タグ参照の読み込みに失敗しました",
+                        "Failed to read a tag reference",
+                        error.message(),
+                    )
                 })?;
                 let Ok(commit) = reference.peel_to_commit() else {
                     continue;
                 };
                 revwalk.push(commit.id()).map_err(|error| {
-                    format!(
-                        "タグ {} を履歴起点に追加できませんでした: {}",
-                        commit.id(),
-                        error.message()
+                    bilingual_with_detail(
+                        format!("タグを履歴起点に追加できませんでした ({})", commit.id()),
+                        format!("Failed to add the tag as a history root ({})", commit.id()),
+                        error.message(),
                     )
                 })?;
                 pushed_any = true;
@@ -155,7 +160,13 @@ pub(super) fn push_history_refs(
     if !pushed_any {
         revwalk
             .push_head()
-            .map_err(|error| format!("HEAD を起点に履歴を辿れませんでした: {}", error.message()))?;
+            .map_err(|error| {
+                bilingual_with_detail(
+                    "HEAD を起点に履歴を辿れませんでした",
+                    "Failed to walk history from HEAD",
+                    error.message(),
+                )
+            })?;
     }
 
     Ok(())
@@ -170,17 +181,17 @@ pub(crate) fn resolve_tag_target_oid(
     let reference = repository
         .find_reference(&reference_name)
         .map_err(|error| {
-            format!(
-                "タグ {} を読み込めませんでした: {}",
-                tag_name,
-                error.message()
+            bilingual_with_detail(
+                format!("タグを読み込めませんでした ({tag_name})"),
+                format!("Failed to load the tag ({tag_name})"),
+                error.message(),
             )
         })?;
     let commit = reference.peel_to_commit().map_err(|error| {
-        format!(
-            "タグ {} のコミットを解決できませんでした: {}",
-            tag_name,
-            error.message()
+        bilingual_with_detail(
+            format!("タグのコミットを解決できませんでした ({tag_name})"),
+            format!("Failed to resolve the tag commit ({tag_name})"),
+            error.message(),
         )
     })?;
 
