@@ -147,12 +147,9 @@ src-tauri/  Tauri + Rust バックエンド
 - 2画面差分ビューは、コミット詳細と Changes Panel の両方から利用できます。
 - テーマ設定はローカルに保存され、次回起動時に復元されます。
 - ウィンドウサイズは次回起動時に復元されます。ウィンドウ位置の復元は Linux の Wayland セッションでは制限されます。
+- 通常のテキスト差分には対応しており、`git-crypt` 管理ファイルには compare view 用の専用フォールバックがあります。
+- `git-crypt` 以外の独自 `diff` / `filter` / `textconv` 設定は、現時点では compare view で未対応です。対象によっては差分を表示できません。
 
 ## ライセンス
 
 このプロジェクトは MIT License のもとで公開されています。詳細は [LICENSE](./LICENSE) を参照してください。
-
-## Compare View 注意
-
-- 通常のテキスト差分には対応しており、`git-crypt` 管理ファイルには compare view 用の専用フォールバックがあります。
-- `git-crypt` 以外の独自 `diff` / `filter` / `textconv` 設定は、現時点では compare view で未対応です。対象によっては差分を表示できません。
