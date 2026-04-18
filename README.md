@@ -23,7 +23,7 @@ Tauri Git is a desktop Git client focused on a compact workflow:
 
 ## Screenshot
 
-![screenshot](images\screenshot-1.png)
+![screenshot](images/screenshot-1.png)
 
 ## Tech Stack
 
