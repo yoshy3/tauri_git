@@ -10,7 +10,8 @@
     "commitMessageEmpty": "Commit message is empty.",
     "stashFilesEmpty": "Select at least one file to stash.",
     "discardFilesEmpty": "Select at least one file to discard.",
-    "branchNameEmpty": "Branch name is empty."
+    "branchNameEmpty": "Branch name is empty.",
+    "tagNameEmpty": "Tag name is empty."
   },
   "topbar": {
     "subtitle": "Minimal git client",
@@ -76,6 +77,31 @@
     "deleting": "Deleting...",
     "cancel": "Cancel"
   },
+  "tagDialog": {
+    "title": "Create Tag",
+    "description": "Create a new tag for {target}. Leave the message empty to create a lightweight tag.",
+    "targetLabel": "Tag target",
+    "nameLabel": "Tag name",
+    "namePlaceholder": "v1.0.0",
+    "messageLabel": "Annotation message",
+    "messagePlaceholder": "Optional message for an annotated tag",
+    "pushAfterCreate": "Push this tag to origin after creating it",
+    "pushUnavailable": "origin is not configured, so tag push is unavailable.",
+    "cancel": "Cancel",
+    "create": "Create Tag",
+    "creating": "Creating..."
+  },
+  "tagDelete": {
+    "title": "Delete Tag",
+    "description": "This action will delete {tag}. Type the full tag name below to confirm.",
+    "targetLabel": "Delete target",
+    "inputLabel": "Tag name",
+    "inputHint": "Enter {tag} exactly to enable deletion.",
+    "nameMismatch": "The tag name does not match.",
+    "delete": "Delete Tag",
+    "deleting": "Deleting...",
+    "cancel": "Cancel"
+  },
   "sidebar": {
     "refs": "Refs",
     "open": "Open",
@@ -92,8 +118,11 @@
     "selectedRef": "Selected Ref",
     "selectedTag": "Selected Tag",
     "branchActions": "Branch actions",
+    "tagActions": "Tag actions",
     "checkout": "Checkout",
     "newBranch": "New Branch",
+    "newTag": "New Tag",
+    "deleteTag": "Delete Tag",
     "cancel": "Cancel",
     "apply": "Apply",
     "applying": "Applying...",

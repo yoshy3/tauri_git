@@ -160,6 +160,35 @@ pub(crate) async fn delete_branch(
 }
 
 #[tauri::command]
+pub(crate) async fn create_tag(
+    path: String,
+    tag_name: String,
+    target: String,
+    message: Option<String>,
+    push_after_create: bool,
+) -> Result<GitStatusResponse, String> {
+    run_blocking(move || {
+        let mut repository = git::open_repo(&path)?;
+        git::create_repository_tag(&repository, &tag_name, &target, message.as_deref())?;
+        if push_after_create {
+            git::push_tag_to_origin(&repository, &tag_name)?;
+        }
+        git::build_repository_status(&mut repository)
+    })
+    .await
+}
+
+#[tauri::command]
+pub(crate) async fn delete_tag(path: String, tag_name: String) -> Result<GitStatusResponse, String> {
+    run_blocking(move || {
+        let mut repository = git::open_repo(&path)?;
+        git::delete_repository_tag(&repository, &tag_name)?;
+        git::build_repository_status(&mut repository)
+    })
+    .await
+}
+
+#[tauri::command]
 pub(crate) async fn stash_changes(
     path: String,
     message: Option<String>,

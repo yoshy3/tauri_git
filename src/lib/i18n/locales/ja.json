@@ -10,7 +10,8 @@
     "commitMessageEmpty": "コミットメッセージが空です。",
     "stashFilesEmpty": "stash するファイルを 1 つ以上選択してください。",
     "discardFilesEmpty": "破棄するファイルを 1 つ以上選択してください。",
-    "branchNameEmpty": "ブランチ名が空です。"
+    "branchNameEmpty": "ブランチ名が空です。",
+    "tagNameEmpty": "タグ名が空です。"
   },
   "topbar": {
     "subtitle": "ミニマルな Git クライアント",
@@ -76,6 +77,31 @@
     "deleting": "削除中...",
     "cancel": "キャンセル"
   },
+  "tagDialog": {
+    "title": "タグを作成",
+    "description": "{target} に新しいタグを作成します。メッセージを空にすると軽量タグを作成します。",
+    "targetLabel": "タグ対象",
+    "nameLabel": "タグ名",
+    "namePlaceholder": "v1.0.0",
+    "messageLabel": "注釈メッセージ",
+    "messagePlaceholder": "注釈付きタグにする場合のみ入力",
+    "pushAfterCreate": "作成後にこのタグを origin へ Push する",
+    "pushUnavailable": "origin が設定されていないため、タグの Push はできません。",
+    "cancel": "キャンセル",
+    "create": "タグを作成",
+    "creating": "作成中..."
+  },
+  "tagDelete": {
+    "title": "タグを削除",
+    "description": "{tag} を削除します。確認のため、下に完全なタグ名を入力してください。",
+    "targetLabel": "削除対象",
+    "inputLabel": "タグ名を入力",
+    "inputHint": "{tag} を正確に入力すると削除できます。",
+    "nameMismatch": "入力したタグ名が一致しません。",
+    "delete": "タグを削除",
+    "deleting": "削除中...",
+    "cancel": "キャンセル"
+  },
   "sidebar": {
     "refs": "参照",
     "open": "開く",
@@ -92,8 +118,11 @@
     "selectedRef": "選択中の参照",
     "selectedTag": "選択中のタグ",
     "branchActions": "ブランチ操作",
+    "tagActions": "タグ操作",
     "checkout": "Checkout",
     "newBranch": "新規ブランチ",
+    "newTag": "新規タグ",
+    "deleteTag": "タグ削除",
     "cancel": "キャンセル",
     "apply": "適用",
     "applying": "適用中...",

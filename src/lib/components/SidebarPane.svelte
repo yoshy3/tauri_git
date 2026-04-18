@@ -11,6 +11,8 @@
   export let onSelectRepository = () => {};
   export let onSelectStash = () => {};
   export let onSelectTag = () => {};
+  export let onOpenCreateTagDialog = () => {};
+  export let onOpenDeleteTagDialog = () => {};
   export let onToggleMenu = () => {};
   export let onCheckoutReference = () => {};
   export let onCreateBranchFromReference = () => {};
@@ -46,6 +48,20 @@
 
   function isRemoteSectionExpanded(name) {
     return remoteSections[name] ?? true;
+  }
+
+  function tagMenuKey(tagName) {
+    return `tag:${tagName}`;
+  }
+
+  function toggleTagMenu(tagName) {
+    const key = tagMenuKey(tagName);
+    onToggleMenu(menuOpenKey === key ? "" : key);
+  }
+
+  function openDeleteTag(tagName) {
+    onToggleMenu("");
+    onOpenDeleteTagDialog(tagName);
   }
 
   function matchesBranchFilter(value) {
@@ -284,25 +300,49 @@
 
       {#if !hasBranchFilter}
       <div class="tree-section">
-        <button class="tree-section-toggle" type="button" on:click={() => toggleSidebarSection("tags")}>
-          <span class:expanded={sidebarSections.tags} class="tree-chevron"></span>
-          <span>{$_("sidebar.tags")}</span>
-        </button>
+        <div class="tree-section-header">
+          <button class="tree-section-toggle tree-section-toggle-grow" type="button" on:click={() => toggleSidebarSection("tags")}>
+            <span class:expanded={sidebarSections.tags} class="tree-chevron"></span>
+            <span>{$_("sidebar.tags")}</span>
+          </button>
+          <button class="tree-section-action" type="button" aria-label={$_("sidebar.newTag")} disabled={loading} on:click={onOpenCreateTagDialog}>
+            +
+          </button>
+        </div>
 
         {#if sidebarSections.tags}
           {#if filteredTags.length > 0}
             <ul class="tree-list tree-section-children">
               {#each filteredTags as tagName}
                 <li>
-                  <button
-                    class:tree-item-current={selectedRef?.kind === "tag" && selectedRef.name === tagName}
-                    class="tree-item tree-item-button"
-                    type="button"
-                    on:click={() => onSelectTag(tagName)}
-                  >
-                    <span class="tree-item-icon tree-item-tag"></span>
-                    <span class="tree-item-label">{tagName}</span>
-                  </button>
+                  <div class:tree-item-current={selectedRef?.kind === "tag" && selectedRef.name === tagName} class="tree-item-row">
+                    <button class="tree-item tree-item-button tree-item-tag-button" type="button" on:click={() => onSelectTag(tagName)}>
+                      <span class="tree-item-icon tree-item-tag"></span>
+                      <span class="tree-item-label">{tagName}</span>
+                    </button>
+
+                    <div class:menu-open={menuOpenKey === tagMenuKey(tagName)} class="tree-item-actions">
+                      <button
+                        class="tree-item-kebab"
+                        type="button"
+                        aria-label={$_("sidebar.tagActions")}
+                        disabled={loading}
+                        on:click={() => toggleTagMenu(tagName)}
+                      >
+                        <span></span>
+                        <span></span>
+                        <span></span>
+                      </button>
+
+                      {#if menuOpenKey === tagMenuKey(tagName)}
+                        <div class="tree-item-menu">
+                          <button class="tree-item-menu-button tree-item-menu-button-danger" type="button" on:click={() => openDeleteTag(tagName)}>
+                            {$_("sidebar.deleteTag")}
+                          </button>
+                        </div>
+                      {/if}
+                    </div>
+                  </div>
                 </li>
               {/each}
             </ul>
@@ -538,6 +578,12 @@
     gap: 0;
   }
 
+  .tree-section-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
   .tree-section-toggle,
   .tree-group-toggle {
     width: 100%;
@@ -566,6 +612,40 @@
 
   .tree-group-toggle:hover {
     background: var(--hover-overlay-soft);
+  }
+
+  .tree-section-toggle-grow {
+    min-width: 0;
+    flex: 1 1 auto;
+  }
+
+  .tree-section-action {
+    width: 24px;
+    height: 24px;
+    flex: 0 0 auto;
+    border: 0;
+    border-radius: 7px;
+    background: transparent;
+    color: var(--text-secondary);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2rem;
+    line-height: 1;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 120ms ease, background 120ms ease, color 120ms ease;
+  }
+
+  .tree-section-header:hover .tree-section-action,
+  .tree-section-action:focus-visible {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .tree-section-action:hover:enabled {
+    background: var(--surface-background-hover);
+    color: var(--text-primary);
   }
 
   .tree-chevron {
@@ -635,6 +715,25 @@
     cursor: pointer;
   }
 
+  .tree-item-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 6px;
+    align-items: center;
+    min-height: 24px;
+    border-radius: 8px;
+    padding: 0 4px 0 0;
+  }
+
+  .tree-item-row:hover {
+    background: var(--hover-overlay);
+  }
+
+  .tree-item-row.tree-item-current {
+    background: var(--accent-soft);
+    box-shadow: inset 0 0 0 1px var(--accent-soft-border);
+  }
+
   .tree-item-button:hover:enabled {
     background: var(--hover-overlay);
     color: var(--text-primary);
@@ -649,6 +748,14 @@
     align-items: center;
     padding-top: 3px;
     padding-bottom: 3px;
+  }
+
+  .tree-item-tag-button {
+    padding-right: 0;
+  }
+
+  .tree-item-tag-button:hover:enabled {
+    background: transparent;
   }
 
   .tree-item-icon {
@@ -710,6 +817,84 @@
 
   .tree-empty.tree-empty-nested {
     padding-left: 24px;
+  }
+
+  .tree-item-actions {
+    position: relative;
+    display: flex;
+    align-items: center;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 120ms ease;
+  }
+
+  .tree-item-row:hover .tree-item-actions,
+  .tree-item-actions.menu-open {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .tree-item-kebab {
+    width: 24px;
+    height: 24px;
+    display: inline-flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    gap: 3px;
+    border: 0;
+    border-radius: 7px;
+    background: var(--surface-background-strong);
+    color: var(--text-secondary);
+    padding: 0;
+  }
+
+  .tree-item-kebab:hover:enabled {
+    background: var(--surface-background-hover);
+  }
+
+  .tree-item-kebab span {
+    width: 3px;
+    height: 3px;
+    border-radius: 999px;
+    background: currentColor;
+  }
+
+  .tree-item-menu {
+    position: absolute;
+    top: calc(100% + 4px);
+    right: 0;
+    min-width: 128px;
+    display: grid;
+    gap: 2px;
+    padding: 6px;
+    border-radius: 10px;
+    background: var(--dialog-background);
+    border: 1px solid var(--surface-border-strong);
+    box-shadow: var(--dialog-shadow);
+    z-index: 8;
+  }
+
+  .tree-item-menu-button {
+    border: 0;
+    border-radius: 7px;
+    background: transparent;
+    color: var(--text-secondary);
+    padding: 8px 10px;
+    font-size: 0.74rem;
+    text-align: left;
+  }
+
+  .tree-item-menu-button:hover:enabled {
+    background: var(--hover-overlay);
+  }
+
+  .tree-item-menu-button.tree-item-menu-button-danger {
+    color: var(--danger-text);
+  }
+
+  .tree-item-menu-button.tree-item-menu-button-danger:hover:enabled {
+    background: var(--danger-soft);
   }
 
   .stash-actions {

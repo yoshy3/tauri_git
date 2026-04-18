@@ -209,6 +209,47 @@ pub(crate) fn push_current_branch_to_target(
     Ok(())
 }
 
+pub(crate) fn push_tag_to_origin(repository: &Repository, tag_name: &str) -> Result<(), String> {
+    let tag_name = tag_name.trim();
+    if tag_name.is_empty() {
+        return Err(bilingual("タグ名が空です。", "Tag name is empty."));
+    }
+
+    if !has_remote(repository, "origin")? {
+        return Err(bilingual(
+            "origin リモートが設定されていません。",
+            "The origin remote is not configured.",
+        ));
+    }
+
+    let output = git_command()
+        .current_dir(repository_root(repository)?)
+        .arg("push")
+        .arg("origin")
+        .arg(format!("refs/tags/{tag_name}"))
+        .output()
+        .map_err(|error| {
+            bilingual_with_detail(
+                "タグ push を実行できませんでした",
+                "Failed to run tag push",
+                error,
+            )
+        })?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+        let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
+        let detail = command_output_detail(&stderr, &stdout);
+        return Err(bilingual_with_detail(
+            "タグ push に失敗しました",
+            "Tag push failed",
+            detail,
+        ));
+    }
+
+    Ok(())
+}
+
 
 pub(super) fn has_remote(repository: &Repository, remote_name: &str) -> Result<bool, String> {
     let remotes = repository

@@ -25,6 +25,8 @@ pub fn run() {
             commands::checkout_branch,
             commands::create_branch,
             commands::delete_branch,
+            commands::create_tag,
+            commands::delete_tag,
             commands::stash_changes,
             commands::discard_changes,
             commands::apply_stash,

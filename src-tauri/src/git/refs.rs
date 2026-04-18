@@ -200,5 +200,86 @@ pub(crate) fn resolve_tag_target_oid(
     })
 }
 
+pub(crate) fn create_repository_tag(
+    repository: &Repository,
+    tag_name: &str,
+    target: &str,
+    message: Option<&str>,
+) -> Result<(), String> {
+    let tag_name = tag_name.trim();
+    if tag_name.is_empty() {
+        return Err(bilingual("タグ名が空です。", "Tag name is empty."));
+    }
+
+    let target = target.trim();
+    if target.is_empty() {
+        return Err(bilingual("タグの対象が空です。", "Tag target is empty."));
+    }
+
+    let repo_root = repository_root(repository)?;
+    let mut command = git_command();
+    command.current_dir(repo_root);
+    command.arg("tag");
+
+    if let Some(message) = message.map(str::trim).filter(|value| !value.is_empty()) {
+        command.arg("-a").arg(tag_name).arg("-m").arg(message).arg(target);
+    } else {
+        command.arg(tag_name).arg(target);
+    }
+
+    let output = command.output().map_err(|error| {
+        bilingual_with_detail(
+            "タグ作成コマンドを実行できませんでした",
+            "Failed to run tag creation command",
+            error,
+        )
+    })?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+        let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
+        let detail = command_output_detail(&stderr, &stdout);
+        return Err(bilingual_with_detail(
+            "タグ作成に失敗しました",
+            "Tag creation failed",
+            detail,
+        ));
+    }
+
+    Ok(())
+}
+
+pub(crate) fn delete_repository_tag(repository: &Repository, tag_name: &str) -> Result<(), String> {
+    let tag_name = tag_name.trim();
+    if tag_name.is_empty() {
+        return Err(bilingual("タグ名が空です。", "Tag name is empty."));
+    }
+
+    let repo_root = repository_root(repository)?;
+    let mut command = git_command();
+    command.current_dir(repo_root).arg("tag").arg("-d").arg(tag_name);
+
+    let output = command.output().map_err(|error| {
+        bilingual_with_detail(
+            "タグ削除コマンドを実行できませんでした",
+            "Failed to run tag delete command",
+            error,
+        )
+    })?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+        let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
+        let detail = command_output_detail(&stderr, &stdout);
+        return Err(bilingual_with_detail(
+            "タグ削除に失敗しました",
+            "Tag deletion failed",
+            detail,
+        ));
+    }
+
+    Ok(())
+}
+
 
 

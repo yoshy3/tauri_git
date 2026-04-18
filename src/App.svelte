@@ -36,6 +36,15 @@
   let branchDialogOpen = false;
   let branchNameDraft = "";
   let branchSwitchAfterCreate = true;
+  let tagDialogOpen = false;
+  let tagNameDraft = "";
+  let tagMessageDraft = "";
+  let tagPushAfterCreate = false;
+  let tagTargetRevision = "HEAD";
+  let tagTargetLabel = "HEAD";
+  let deleteTagDialogOpen = false;
+  let deleteTagNameDraft = "";
+  let deleteTargetTagName = "";
   let deleteDialogOpen = false;
   let deleteBranchNameDraft = "";
   let deleteTargetRef = null;
@@ -108,7 +117,9 @@
       Boolean(topbarBusyAction) ||
       Boolean(stashBusyAction) ||
       branchDialogOpen ||
+      tagDialogOpen ||
       deleteDialogOpen ||
+      deleteTagDialogOpen ||
       discardDialogOpen ||
       pushDialogOpen
     );
@@ -132,6 +143,21 @@
     deleteBranchNameDraft = "";
     deleteTargetRef = null;
     deleteForceEnabled = false;
+  }
+
+  function resetTagDialog() {
+    tagDialogOpen = false;
+    tagNameDraft = "";
+    tagMessageDraft = "";
+    tagPushAfterCreate = false;
+    tagTargetRevision = "HEAD";
+    tagTargetLabel = "HEAD";
+  }
+
+  function resetDeleteTagDialog() {
+    deleteTagDialogOpen = false;
+    deleteTagNameDraft = "";
+    deleteTargetTagName = "";
   }
 
   function resetDiscardDialog() {
@@ -283,6 +309,8 @@
       rightPaneExpanded = false;
       rightPaneTab = "commit";
     }
+    resetTagDialog();
+    resetDeleteTagDialog();
     loading = true;
 
     try {
@@ -341,6 +369,8 @@
       selectedCommitDetailLoading = false;
       closeBranchMenu();
       resetPushDialog();
+      resetTagDialog();
+      resetDeleteTagDialog();
       rightPaneExpanded = false;
       rightPaneTab = "commit";
       void loadCommitHistory(repository.repo_path);
@@ -736,7 +766,7 @@
       displayName: tagName,
       canCheckout: false,
       canCreateBranch: true,
-      canDelete: false,
+      canDelete: true,
     };
     error = "";
 
@@ -773,6 +803,134 @@
     deleteBranchNameDraft = "";
     deleteForceEnabled = false;
     deleteDialogOpen = true;
+  }
+
+  function buildTagTarget() {
+    if (selectedCommitOid) {
+      const selectedCommitSummary =
+        selectedCommitDetail?.oid === selectedCommitOid
+          ? selectedCommitDetail.summary
+          : historyCommits.find((commit) => commit.oid === selectedCommitOid)?.summary ?? "";
+
+      return {
+        revision: selectedCommitOid,
+        label: selectedCommitSummary
+          ? `${selectedCommitOid.slice(0, 7)} (${t("history.details.sha")}) - ${selectedCommitSummary}`
+          : `${selectedCommitOid.slice(0, 7)} (${t("history.details.sha")})`,
+      };
+    }
+
+    if (selectedRef?.kind === "remote_branch") {
+      return {
+        revision: `${selectedRef.remoteName}/${selectedRef.name}`,
+        label: selectedRef.displayName,
+      };
+    }
+
+    if (selectedRef?.name) {
+      return {
+        revision: selectedRef.name,
+        label: selectedRef.displayName ?? selectedRef.name,
+      };
+    }
+
+    return {
+      revision: "HEAD",
+      label: repository?.branch ? `HEAD (${repository.branch})` : "HEAD",
+    };
+  }
+
+  function openCreateTagDialog() {
+    if (!repository) {
+      error = t("errors.openRepositoryFirst");
+      return;
+    }
+
+    closeBranchMenu();
+    const target = buildTagTarget();
+    tagTargetRevision = target.revision;
+    tagTargetLabel = target.label;
+    tagNameDraft = "";
+    tagMessageDraft = "";
+    tagPushAfterCreate = false;
+    tagDialogOpen = true;
+    error = "";
+  }
+
+  async function createTag() {
+    if (!repository) {
+      error = t("errors.openRepositoryFirst");
+      return;
+    }
+
+    if (!tagNameDraft.trim()) {
+      error = t("errors.tagNameEmpty");
+      return;
+    }
+
+    loading = true;
+    error = "";
+
+    try {
+      repository = await invoke("create_tag", {
+        path: repository.repo_path,
+        tagName: tagNameDraft.trim(),
+        target: tagTargetRevision,
+        message: tagMessageDraft.trim() || null,
+        pushAfterCreate: tagPushAfterCreate,
+      });
+
+      resetTagDialog();
+      void loadCommitHistory(repository.repo_path, { preserveSelection: true });
+    } catch (message) {
+      error = String(message);
+    } finally {
+      loading = false;
+    }
+  }
+
+  function openDeleteTagDialog(tagName = selectedRef?.kind === "tag" ? selectedRef.name : "") {
+    if (!repository || !tagName) {
+      return;
+    }
+
+    closeBranchMenu();
+    deleteTargetTagName = tagName;
+    deleteTagNameDraft = "";
+    deleteTagDialogOpen = true;
+    error = "";
+  }
+
+  async function confirmDeleteTag() {
+    if (!repository || !deleteTargetTagName) {
+      return;
+    }
+
+    if (deleteTagNameDraft.trim() !== deleteTargetTagName) {
+      error = t("tagDelete.nameMismatch");
+      return;
+    }
+
+    loading = true;
+    error = "";
+
+    try {
+      repository = await invoke("delete_tag", {
+        path: repository.repo_path,
+        tagName: deleteTargetTagName,
+      });
+
+      if (selectedRef?.kind === "tag" && selectedRef.name === deleteTargetTagName) {
+        selectedRef = null;
+        pendingRefCommitOid = "";
+      }
+      resetDeleteTagDialog();
+      void loadCommitHistory(repository.repo_path, { preserveSelection: true });
+    } catch (message) {
+      error = String(message);
+    } finally {
+      loading = false;
+    }
   }
 
   async function confirmDeleteReference() {
@@ -1203,6 +1361,8 @@
       onSelectRepository={selectRepository}
       onSelectStash={(index) => (selectedStashIndex = index)}
       onSelectTag={selectTag}
+      onOpenCreateTagDialog={openCreateTagDialog}
+      onOpenDeleteTagDialog={openDeleteTagDialog}
       menuOpenKey={branchMenuOpenKey}
       onToggleMenu={(key) => (branchMenuOpenKey = key)}
       onCheckoutReference={checkoutReference}
@@ -1294,6 +1454,50 @@
     </div>
   {/if}
 
+  {#if tagDialogOpen}
+    <div class="dialog-backdrop" role="presentation" on:click={(event) => event.target === event.currentTarget && !loading && resetTagDialog()}>
+      <section class="dialog-card" role="dialog" aria-modal="true" aria-labelledby="tag-dialog-title">
+        <div class="dialog-copy">
+          <h2 id="tag-dialog-title">{t("tagDialog.title")}</h2>
+          <p>{t("tagDialog.description", { target: tagTargetLabel })}</p>
+        </div>
+
+        <div class="dialog-warning">
+          <span class="dialog-warning-label">{t("tagDialog.targetLabel")}</span>
+          <code>{tagTargetLabel}</code>
+        </div>
+
+        <label class="dialog-field">
+          <span>{t("tagDialog.nameLabel")}</span>
+          <input bind:value={tagNameDraft} placeholder={t("tagDialog.namePlaceholder")} disabled={loading} />
+        </label>
+
+        <label class="dialog-field">
+          <span>{t("tagDialog.messageLabel")}</span>
+          <textarea bind:value={tagMessageDraft} rows="4" placeholder={t("tagDialog.messagePlaceholder")} disabled={loading}></textarea>
+        </label>
+
+        <label class="dialog-checkbox">
+          <input type="checkbox" bind:checked={tagPushAfterCreate} disabled={loading || !repository?.has_origin_remote} />
+          <span>{t("tagDialog.pushAfterCreate")}</span>
+        </label>
+
+        {#if repository && !repository.has_origin_remote}
+          <p class="dialog-helper">{t("tagDialog.pushUnavailable")}</p>
+        {/if}
+
+        <div class="dialog-actions">
+          <button class="dialog-button dialog-button-muted" type="button" on:click={resetTagDialog} disabled={loading}>
+            {t("tagDialog.cancel")}
+          </button>
+          <button class="dialog-button" type="button" on:click={createTag} disabled={loading}>
+            {loading ? t("tagDialog.creating") : t("tagDialog.create")}
+          </button>
+        </div>
+      </section>
+    </div>
+  {/if}
+
   {#if deleteDialogOpen && deleteTargetRef}
     <div class="dialog-backdrop" role="presentation" on:click={(event) => event.target === event.currentTarget && !loading && resetDeleteDialog()}>
       <section class="dialog-card" role="dialog" aria-modal="true" aria-labelledby="delete-dialog-title">
@@ -1332,6 +1536,43 @@
             disabled={loading || deleteBranchNameDraft.trim() !== deleteTargetRef.displayName}
           >
             {loading ? t("branchDelete.deleting") : t("branchDelete.delete")}
+          </button>
+        </div>
+      </section>
+    </div>
+  {/if}
+
+  {#if deleteTagDialogOpen && deleteTargetTagName}
+    <div class="dialog-backdrop" role="presentation" on:click={(event) => event.target === event.currentTarget && !loading && resetDeleteTagDialog()}>
+      <section class="dialog-card" role="dialog" aria-modal="true" aria-labelledby="delete-tag-dialog-title">
+        <div class="dialog-copy">
+          <h2 id="delete-tag-dialog-title">{t("tagDelete.title")}</h2>
+          <p>{t("tagDelete.description", { tag: deleteTargetTagName })}</p>
+        </div>
+
+        <div class="dialog-warning">
+          <span class="dialog-warning-label">{t("tagDelete.targetLabel")}</span>
+          <code>{deleteTargetTagName}</code>
+        </div>
+
+        <label class="dialog-field">
+          <span>{t("tagDelete.inputLabel")}</span>
+          <input bind:value={deleteTagNameDraft} placeholder={deleteTargetTagName} disabled={loading} />
+        </label>
+
+        <p class="dialog-helper">{t("tagDelete.inputHint", { tag: deleteTargetTagName })}</p>
+
+        <div class="dialog-actions">
+          <button class="dialog-button dialog-button-muted" type="button" on:click={resetDeleteTagDialog} disabled={loading}>
+            {t("tagDelete.cancel")}
+          </button>
+          <button
+            class="dialog-button dialog-button-danger"
+            type="button"
+            on:click={confirmDeleteTag}
+            disabled={loading || deleteTagNameDraft.trim() !== deleteTargetTagName}
+          >
+            {loading ? t("tagDelete.deleting") : t("tagDelete.delete")}
           </button>
         </div>
       </section>
@@ -1523,7 +1764,26 @@
     padding: 11px 12px;
   }
 
+  .dialog-field textarea {
+    width: 100%;
+    box-sizing: border-box;
+    border: 1px solid var(--surface-border);
+    border-radius: 10px;
+    background: var(--input-background);
+    color: var(--text-secondary);
+    padding: 11px 12px;
+    resize: vertical;
+    min-height: 96px;
+  }
+
   .dialog-field input:focus {
+    outline: none;
+    border-color: var(--input-border-focus);
+    box-shadow: var(--focus-ring);
+    background: var(--input-background-focus);
+  }
+
+  .dialog-field textarea:focus {
     outline: none;
     border-color: var(--input-border-focus);
     box-shadow: var(--focus-ring);

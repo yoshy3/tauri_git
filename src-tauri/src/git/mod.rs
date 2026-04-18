@@ -39,9 +39,9 @@ use diff::{
 };
 pub(crate) use history::{load_commit_detail, load_commit_history_chunk};
 use refs::{load_reference_labels, push_history_refs};
-pub(crate) use refs::resolve_tag_target_oid;
+pub(crate) use refs::{create_repository_tag, delete_repository_tag, resolve_tag_target_oid};
 pub(crate) use remotes::{
-    fetch_default_remote, pull_current_branch_ff_only, push_current_branch_to_target,
+    fetch_default_remote, pull_current_branch_ff_only, push_current_branch_to_target, push_tag_to_origin,
 };
 use remotes::has_remote;
 pub(crate) use repository::open_repo;
