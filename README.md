@@ -35,6 +35,9 @@ Tauri Git is a desktop Git client focused on a compact workflow:
 - Commit history search and filtering
 - Branch search and filtering in the sidebar
 - Tag selection in the sidebar with commit selection and scroll-to in history
+- Tag creation dialog in WebView
+- Tag deletion flow from the sidebar menu
+- Optional tag push to `origin` after creation
 - Commit detail panel with author / committer / refs / parents / changed files
 - Side-by-side diff dialog from commit details
 - Side-by-side diff dialog from the changes panel
