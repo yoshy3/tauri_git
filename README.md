@@ -12,8 +12,10 @@ Tauri Git is a desktop Git client focused on a compact workflow:
 - Inspect working tree status
 - Browse commit history
 - Commit changes
+- Amend the latest commit from the commit dialog
 - Create and apply stashes
 - Fetch, pull, and push
+- Force-push amended or diverged branches with an explicit confirmation flow
 - Show pending pull / push commit counts in the top bar and next to local branches in the sidebar
 - Browse branches and remotes in a tree view
 - Browse tags and jump from a tag to its commit in history
@@ -42,9 +44,12 @@ Tauri Git is a desktop Git client focused on a compact workflow:
 - Side-by-side diff dialog from commit details
 - Side-by-side diff dialog from the changes panel
 - Commit creation from the changes panel
+- Commit amend from the changes panel, with previous summary / description prefilled
+- Warning when amending a commit that has already been pushed
 - Stash create / apply / pop
 - Stash selection and apply / pop from the sidebar
 - `Fetch`, `Pull`, `Push`, and `Refresh`
+- Optional `--force-with-lease` push flow for amended or diverged branch history
 - Top-bar badges for incoming / outgoing commit counts on `Pull` and `Push`
 - Incoming / outgoing commit counts next to local branch names in the sidebar
 - Local and remote branch tree display with `/`-based nesting
