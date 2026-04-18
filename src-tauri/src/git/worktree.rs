@@ -1,6 +1,6 @@
 ﻿use super::*;
 
-pub(crate) fn create_commit(repository: &Repository, message: &str) -> Result<(), String> {
+pub(crate) fn create_commit(repository: &Repository, message: &str, amend: bool) -> Result<(), String> {
     if message.trim().is_empty() {
         return Err(bilingual(
             "コミットメッセージが空です。",
@@ -81,24 +81,50 @@ pub(crate) fn create_commit(repository: &Repository, message: &str) -> Result<()
         ));
     }
 
-    let parents: Vec<&git2::Commit<'_>> = parent_commit.iter().collect();
-
-    repository
-        .commit(
-            Some("HEAD"),
-            &signature,
-            &signature,
-            message.trim(),
-            &tree,
-            &parents,
-        )
-        .map_err(|error| {
-            bilingual_with_detail(
-                "コミットに失敗しました",
-                "Commit failed",
-                error.message(),
+    if amend {
+        let parent_commit = parent_commit.ok_or_else(|| {
+            bilingual(
+                "amend する直前コミットがありません。",
+                "There is no previous commit to amend.",
             )
         })?;
+
+        parent_commit
+            .amend(
+                Some("HEAD"),
+                Some(&parent_commit.author()),
+                Some(&signature),
+                None,
+                Some(message.trim()),
+                Some(&tree),
+            )
+            .map_err(|error| {
+                bilingual_with_detail(
+                    "amend に失敗しました",
+                    "Amend failed",
+                    error.message(),
+                )
+            })?;
+    } else {
+        let parents: Vec<&git2::Commit<'_>> = parent_commit.iter().collect();
+
+        repository
+            .commit(
+                Some("HEAD"),
+                &signature,
+                &signature,
+                message.trim(),
+                &tree,
+                &parents,
+            )
+            .map_err(|error| {
+                bilingual_with_detail(
+                    "コミットに失敗しました",
+                    "Commit failed",
+                    error.message(),
+                )
+            })?;
+    }
 
     repository
         .checkout_head(None)

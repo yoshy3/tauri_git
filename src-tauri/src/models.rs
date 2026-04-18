@@ -22,6 +22,8 @@ pub(crate) struct GitStatusResponse {
     pub(crate) is_clean: bool,
     pub(crate) entries: Vec<GitStatusEntry>,
     pub(crate) head_summary: Option<String>,
+    pub(crate) head_message: Option<String>,
+    pub(crate) head_is_pushed: bool,
     pub(crate) local_branches: Vec<String>,
     pub(crate) local_branch_syncs: Vec<GitLocalBranchSync>,
     pub(crate) remote_groups: Vec<GitRemoteGroup>,

@@ -42,10 +42,11 @@ pub(crate) async fn get_repository_status(path: String) -> Result<GitStatusRespo
 pub(crate) async fn commit_all(
     path: String,
     message: String,
+    amend: bool,
 ) -> Result<GitStatusResponse, String> {
     run_blocking(move || {
         let mut repository = git::open_repo(&path)?;
-        git::create_commit(&repository, &message)?;
+        git::create_commit(&repository, &message, amend)?;
         git::build_repository_status(&mut repository)
     })
     .await
@@ -56,11 +57,13 @@ pub(crate) async fn commit_and_push(
     path: String,
     message: String,
     create_upstream_if_missing: bool,
+    amend: bool,
+    force_with_lease: bool,
 ) -> Result<GitStatusResponse, String> {
     run_blocking(move || {
         let mut repository = git::open_repo(&path)?;
-        git::create_commit(&repository, &message)?;
-        git::push_current_branch_to_target(&repository, create_upstream_if_missing)?;
+        git::create_commit(&repository, &message, amend)?;
+        git::push_current_branch_to_target(&repository, create_upstream_if_missing, force_with_lease)?;
         git::build_repository_status(&mut repository)
     })
     .await
@@ -90,10 +93,11 @@ pub(crate) async fn pull_current_branch(path: String) -> Result<GitStatusRespons
 pub(crate) async fn push_current_branch(
     path: String,
     create_upstream_if_missing: bool,
+    force_with_lease: bool,
 ) -> Result<GitStatusResponse, String> {
     run_blocking(move || {
         let mut repository = git::open_repo(&path)?;
-        git::push_current_branch_to_target(&repository, create_upstream_if_missing)?;
+        git::push_current_branch_to_target(&repository, create_upstream_if_missing, force_with_lease)?;
         git::build_repository_status(&mut repository)
     })
     .await

@@ -69,6 +69,11 @@ pub(crate) fn build_repository_status(repository: &mut Repository) -> Result<Git
             let summary = commit.summary().unwrap_or("(no summary)");
             format!("{short_id} {summary}")
         });
+    let head_message = repository
+        .head()
+        .ok()
+        .and_then(|head| head.peel_to_commit().ok())
+        .and_then(|commit| commit.message().map(ToOwned::to_owned));
     let head_oid = repository
         .head()
         .ok()
@@ -97,6 +102,7 @@ pub(crate) fn build_repository_status(repository: &mut Repository) -> Result<Git
         .find(|entry| entry.name == branch)
         .map(|entry| (entry.ahead_count, entry.behind_count))
         .unwrap_or((0, 0));
+    let head_is_pushed = current_branch_upstream_name.is_some() && ahead_count == 0;
     let local_branches = local_branch_syncs
         .iter()
         .map(|entry| entry.name.clone())
@@ -123,6 +129,8 @@ pub(crate) fn build_repository_status(repository: &mut Repository) -> Result<Git
         is_clean: entries.is_empty(),
         entries,
         head_summary,
+        head_message,
+        head_is_pushed,
         local_branches,
         local_branch_syncs,
         remote_groups,

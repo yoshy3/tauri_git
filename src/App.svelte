@@ -53,6 +53,7 @@
   let discardPendingPaths = [];
   let pushDialogOpen = false;
   let pendingPushAction = null;
+  let pushForceWithLease = false;
   let theme = "dark";
   let leftPaneWidth = 246;
   let rightPaneWidth = 332;
@@ -97,6 +98,8 @@
       behind_count: status.behind_count ?? 0,
       is_clean: status.is_clean,
       entries: status.entries ?? [],
+      head_message: status.head_message ?? null,
+      head_is_pushed: status.head_is_pushed ?? false,
       local_branches: status.local_branches ?? [],
       local_branch_syncs: status.local_branch_syncs ?? [],
       remote_groups: status.remote_groups ?? [],
@@ -169,6 +172,7 @@
     pendingPushAction?.resolve?.(result);
     pushDialogOpen = false;
     pendingPushAction = null;
+    pushForceWithLease = false;
   }
 
   function closeBranchMenu() {
@@ -394,13 +398,13 @@
     return t("push.currentBranchUnavailableMessage");
   }
 
-  function openPushDialog(kind, message = "") {
+  function openPushDialog(kind, payload = {}) {
     if (!repository) {
       error = t("errors.openRepositoryFirst");
       return Promise.resolve(false);
     }
 
-    if (currentBranchHasUpstream()) {
+    if (currentBranchHasUpstream() && !payload.allowForcePush) {
       return Promise.resolve(true);
     }
 
@@ -413,7 +417,7 @@
     error = "";
 
     return new Promise((resolve) => {
-      pendingPushAction = { kind, message, resolve };
+      pendingPushAction = { kind, payload, resolve };
       pushDialogOpen = true;
     });
   }
@@ -432,6 +436,7 @@
       repository = await invoke("push_current_branch", {
         path: repository.repo_path,
         createUpstreamIfMissing,
+        forceWithLease: pushForceWithLease,
       });
       void loadCommitHistory(repository.repo_path);
       return true;
@@ -444,7 +449,7 @@
     }
   }
 
-  async function runCommitAndPushChanges(message, createUpstreamIfMissing = false) {
+  async function runCommitAndPushChanges(message, amend = false, createUpstreamIfMissing = false) {
     if (!repository) {
       error = t("errors.openRepositoryFirst");
       return false;
@@ -457,6 +462,8 @@
         path: repository.repo_path,
         message,
         createUpstreamIfMissing,
+        amend,
+        forceWithLease: pushForceWithLease,
       });
       repository = updated;
       rightPaneExpanded = false;
@@ -489,7 +496,12 @@
       }
 
       if (!currentBranchHasUpstream()) {
-        await openPushDialog("push");
+        await openPushDialog("push", { createUpstreamIfMissing: true });
+        return;
+      }
+
+      if (repository.ahead_count > 0 && repository.behind_count > 0) {
+        await openPushDialog("push", { allowForcePush: true });
         return;
       }
 
@@ -521,7 +533,7 @@
     }
   }
 
-  async function commitChanges(message) {
+  async function commitChanges(message, amend = false) {
     if (!repository) {
       error = t("errors.openRepositoryFirst");
       return false;
@@ -538,6 +550,7 @@
       const updated = await invoke("commit_all", {
         path: repository.repo_path,
         message,
+        amend,
       });
       repository = updated;
       rightPaneExpanded = false;
@@ -596,7 +609,7 @@
     rightPaneTab = "commit";
   }
 
-  async function commitAndPushChanges(message) {
+  async function commitAndPushChanges(message, amend = false) {
     if (!repository) {
       error = t("errors.openRepositoryFirst");
       return false;
@@ -613,10 +626,22 @@
     }
 
     if (!currentBranchHasUpstream()) {
-      return await openPushDialog("commit_and_push", message);
+      return await openPushDialog("commit_and_push", {
+        message,
+        amend,
+        createUpstreamIfMissing: true,
+      });
     }
 
-    return await runCommitAndPushChanges(message, false);
+    if (amend && repository.head_is_pushed) {
+      return await openPushDialog("commit_and_push", {
+        message,
+        amend,
+        allowForcePush: true,
+      });
+    }
+
+    return await runCommitAndPushChanges(message, amend, false);
   }
 
   async function checkoutBranch(branchName, remoteName = null) {
@@ -702,6 +727,20 @@
       return "";
     }
 
+    if (pendingPushAction?.payload?.allowForcePush) {
+      if (pendingPushAction?.kind === "commit_and_push") {
+        return t("push.forceAfterCommitDescription", {
+          branch: repository.branch,
+          remote: repository.current_branch_upstream_name ?? `origin/${repository.branch}`,
+        });
+      }
+
+      return t("push.forceDescription", {
+        branch: repository.branch,
+        remote: repository.current_branch_upstream_name ?? `origin/${repository.branch}`,
+      });
+    }
+
     if (pendingPushAction?.kind === "commit_and_push") {
       return t("push.createBranchAfterCommitDescription", {
         branch: repository.branch,
@@ -715,6 +754,30 @@
     });
   }
 
+  function pushDialogTitle() {
+    if (pendingPushAction?.payload?.allowForcePush) {
+      return t("push.forceTitle");
+    }
+
+    return t("push.noUpstreamTitle");
+  }
+
+  function pushDialogConfirmLabel() {
+    if (pendingPushAction?.payload?.allowForcePush) {
+      if (pendingPushAction?.kind === "commit_and_push") {
+        return commitAndPushing ? t("push.commitForcePushing") : t("push.commitForcePush");
+      }
+
+      return loading ? t("push.forcePushing") : t("push.forcePush");
+    }
+
+    if (pendingPushAction?.kind === "commit_and_push") {
+      return commitAndPushing ? t("push.commitCreatingAndPushing") : t("push.commitCreateAndPush");
+    }
+
+    return loading ? t("push.creatingAndPushing") : t("push.createAndPush");
+  }
+
   async function confirmPushDialog() {
     if (!pendingPushAction) {
       resetPushDialog(false);
@@ -723,8 +786,12 @@
 
     const success =
       pendingPushAction.kind === "commit_and_push"
-        ? await runCommitAndPushChanges(pendingPushAction.message, true)
-        : await runPushCurrentBranch(true);
+        ? await runCommitAndPushChanges(
+            pendingPushAction.payload?.message ?? "",
+            pendingPushAction.payload?.amend ?? false,
+            pendingPushAction.payload?.createUpstreamIfMissing ?? false,
+          )
+        : await runPushCurrentBranch(pendingPushAction.payload?.createUpstreamIfMissing ?? false);
 
     if (success) {
       resetPushDialog(true);
@@ -1614,7 +1681,7 @@
     >
       <section class="dialog-card" role="dialog" aria-modal="true" aria-labelledby="push-dialog-title">
         <div class="dialog-copy">
-          <h2 id="push-dialog-title">{t("push.noUpstreamTitle")}</h2>
+          <h2 id="push-dialog-title">{pushDialogTitle()}</h2>
           <p>{pushDialogDescription()}</p>
         </div>
 
@@ -1622,6 +1689,14 @@
           <span class="dialog-warning-label">{t("push.targetLabel")}</span>
           <code>{pushDialogTarget()}</code>
         </div>
+
+        {#if pendingPushAction?.payload?.allowForcePush}
+          <label class="dialog-checkbox">
+            <input type="checkbox" bind:checked={pushForceWithLease} disabled={loading || commitAndPushing} />
+            <span>{t("push.forceOption")}</span>
+          </label>
+          <p class="dialog-helper">{t("push.forceHelper")}</p>
+        {/if}
 
         <div class="dialog-actions">
           <button
@@ -1633,13 +1708,7 @@
             {t("push.dialogCancel")}
           </button>
           <button class="dialog-button" type="button" on:click={confirmPushDialog} disabled={loading || commitAndPushing}>
-            {pendingPushAction?.kind === "commit_and_push"
-              ? commitAndPushing
-                ? t("push.commitCreatingAndPushing")
-                : t("push.commitCreateAndPush")
-              : loading
-                ? t("push.creatingAndPushing")
-                : t("push.createAndPush")}
+            {pushDialogConfirmLabel()}
           </button>
         </div>
       </section>

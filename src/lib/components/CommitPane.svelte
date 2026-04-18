@@ -20,6 +20,7 @@
 
   let commitSummary = "";
   let commitDescription = "";
+  let amendCommit = false;
   let stashMessage = "";
   let stashSelectedPaths = [];
   let discardSelectedPaths = [];
@@ -80,25 +81,56 @@
     compareDialogStatus = "";
   }
 
+  function splitCommitMessage(message) {
+    const normalized = (message ?? "").replace(/\r\n/g, "\n").trim();
+
+    if (!normalized) {
+      return { summary: "", description: "" };
+    }
+
+    const [summaryLine = "", ...restLines] = normalized.split("\n");
+    const description = restLines.join("\n").replace(/^\n+/, "").trim();
+    return {
+      summary: summaryLine.trim(),
+      description,
+    };
+  }
+
+  function applyHeadMessageToDraft() {
+    const { summary, description } = splitCommitMessage(repository?.head_message ?? "");
+    commitSummary = summary;
+    commitDescription = description;
+  }
+
+  function handleAmendChange(checked) {
+    amendCommit = checked;
+
+    if (checked) {
+      applyHeadMessageToDraft();
+    }
+  }
+
   async function handleCommit() {
     const summary = commitSummary.trim();
     const description = commitDescription.trim();
 
     if (!summary) {
-      const success = await onCommit("");
+      const success = await onCommit("", amendCommit);
       if (success) {
         commitSummary = "";
         commitDescription = "";
+        amendCommit = false;
       }
       return;
     }
 
     const message = description ? `${summary}\n\n${description}` : summary;
-    const success = await onCommit(message);
+    const success = await onCommit(message, amendCommit);
 
     if (success) {
       commitSummary = "";
       commitDescription = "";
+      amendCommit = false;
     }
   }
 
@@ -132,20 +164,22 @@
     const description = commitDescription.trim();
 
     if (!summary) {
-      const success = await onCommitAndPush("");
+      const success = await onCommitAndPush("", amendCommit);
       if (success) {
         commitSummary = "";
         commitDescription = "";
+        amendCommit = false;
       }
       return;
     }
 
     const message = description ? `${summary}\n\n${description}` : summary;
-    const success = await onCommitAndPush(message);
+    const success = await onCommitAndPush(message, amendCommit);
 
     if (success) {
       commitSummary = "";
       commitDescription = "";
+      amendCommit = false;
     }
   }
 
@@ -200,6 +234,7 @@
     currentRepoPath = nextRepoPath;
     commitSummary = "";
     commitDescription = "";
+    amendCommit = false;
     stashMessage = "";
     stashSelectedPaths = changedEntries.map((entry) => entry.path);
     discardSelectedPaths = changedEntries.map((entry) => entry.path);
@@ -434,6 +469,23 @@
             <textarea bind:value={commitDescription} rows="6" placeholder={$_("commit.descriptionPlaceholder")}></textarea>
           </label>
 
+          <label class="commit-option">
+            <input
+              type="checkbox"
+              checked={amendCommit}
+              disabled={!repository?.head_oid || committing || commitAndPushing}
+              on:change={(event) => handleAmendChange(event.currentTarget.checked)}
+            />
+            <span class="commit-option-label">{$_("commit.amendLabel")}</span>
+          </label>
+
+          {#if amendCommit && repository?.head_is_pushed}
+            <p class="commit-warning">
+              <span class="commit-warning-icon" aria-hidden="true">!</span>
+              <span class="commit-warning-text">{$_("commit.amendPushedWarning")}</span>
+            </p>
+          {/if}
+
           <div class="commit-actions">
             <button class="primary wide" on:click={handleCommit} disabled={!repository || committing || commitAndPushing || repository.is_clean}>
               {committing
@@ -486,6 +538,72 @@
   .right-pane.collapsed-pane {
     padding-left: 0;
     padding-right: 8px;
+  }
+
+  .commit-panel label.commit-option {
+    display: inline-flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 12px;
+    justify-content: flex-start;
+    width: auto;
+    max-width: 100%;
+    align-self: flex-start;
+    cursor: pointer;
+    padding: 2px 0;
+  }
+
+  .commit-option input {
+    margin: 0;
+    flex: 0 0 auto;
+    width: 16px;
+    height: 16px;
+    padding: 0;
+  }
+
+  .commit-option-label {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    font-weight: 600;
+    line-height: 1;
+    letter-spacing: 0.01em;
+    white-space: nowrap;
+  }
+
+  .commit-warning {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: start;
+    gap: 10px;
+    margin: 2px 0 4px;
+    padding: 10px 12px;
+    border: 1px solid rgba(242, 169, 92, 0.28);
+    border-radius: 10px;
+    background: linear-gradient(180deg, rgba(73, 50, 13, 0.3), rgba(49, 34, 10, 0.22));
+    color: var(--warning-text);
+    box-shadow: inset 0 1px 0 rgba(255, 234, 189, 0.05);
+  }
+
+  .commit-warning-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    margin-top: 1px;
+    border-radius: 6px;
+    background: linear-gradient(180deg, #ffd54a, #f1b92c);
+    color: #2c2305;
+    font-size: 0.95rem;
+    font-weight: 900;
+    line-height: 1;
+    box-shadow: 0 0 0 1px rgba(52, 38, 8, 0.35);
+  }
+
+  .commit-warning-text {
+    color: var(--warning-text);
+    font-size: 0.9rem;
+    line-height: 1.55;
   }
 
   .pane-toggle {
@@ -721,7 +839,7 @@
     font-size: 0.78rem;
   }
 
-  .commit-panel input,
+  .commit-panel input:not([type="checkbox"]),
   .commit-panel textarea {
     width: 100%;
     box-sizing: border-box;
@@ -733,7 +851,7 @@
     transition: border-color 120ms ease, box-shadow 120ms ease, background 120ms ease;
   }
 
-  .commit-panel input:focus,
+  .commit-panel input:not([type="checkbox"]):focus,
   .commit-panel textarea:focus {
     outline: none;
     border-color: var(--input-border-focus);

@@ -178,12 +178,21 @@ pub(crate) fn pull_current_branch_ff_only(repository: &Repository) -> Result<(),
 pub(crate) fn push_current_branch_to_target(
     repository: &Repository,
     create_upstream_if_missing: bool,
+    force_with_lease: bool,
 ) -> Result<(), String> {
     let (branch, target) = resolve_push_target(repository, create_upstream_if_missing)?;
-    let output = git_command()
-        .current_dir(repository_root(repository)?)
-        .arg("push")
-        .args(target.set_upstream.then_some("-u"))
+    let mut command = git_command();
+    command.current_dir(repository_root(repository)?).arg("push");
+
+    if force_with_lease {
+        command.arg("--force-with-lease");
+    }
+
+    if target.set_upstream {
+        command.arg("-u");
+    }
+
+    let output = command
         .arg(&target.remote_name)
         .arg(format!("{branch}:{}", target.remote_branch_name))
         .output()
