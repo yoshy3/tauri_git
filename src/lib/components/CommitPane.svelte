@@ -477,13 +477,13 @@
     flex-direction: column;
     gap: 10px;
     overflow: hidden;
-    width: 332px;
-    justify-self: end;
-    transition: width 160ms ease, padding 160ms ease;
+    width: 100%;
+    min-width: 0;
+    justify-self: stretch;
+    transition: padding 160ms ease;
   }
 
   .right-pane.collapsed-pane {
-    width: 54px;
     padding-left: 0;
     padding-right: 8px;
   }

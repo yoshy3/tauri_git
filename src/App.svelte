@@ -45,13 +45,25 @@
   let pushDialogOpen = false;
   let pendingPushAction = null;
   let theme = "dark";
+  let leftPaneWidth = 246;
+  let rightPaneWidth = 332;
+  let workspaceElement;
+  let resizeCleanup = null;
+  let viewportWidth = 0;
 
   const topActions = ["Fetch", "Pull", "Push", "Stash", "Discard"];
   const implementedTopActions = ["Fetch", "Pull", "Push", "Stash", "Discard"];
   const lastRepositoryKey = "tauri-git:last-repository-path";
   const themeStorageKey = "tauri-git:theme";
+  const paneLayoutStorageKey = "tauri-git:pane-layout";
   const historyBatchSize = 100;
   const autoRefreshIntervalMs = 2500;
+  const minLeftPaneWidth = 180;
+  const maxLeftPaneWidth = 420;
+  const minCenterPaneWidth = 360;
+  const minRightPaneWidth = 260;
+  const maxRightPaneWidth = 560;
+  const collapsedRightPaneWidth = 54;
   let autoRefreshInFlight = false;
   let appVisible = true;
 
@@ -145,6 +157,108 @@
 
   function toggleTheme() {
     applyTheme(theme === "dark" ? "light" : "dark");
+  }
+
+  function clamp(value, min, max) {
+    return Math.min(Math.max(value, min), max);
+  }
+
+  function savePaneLayout() {
+    localStorage.setItem(
+      paneLayoutStorageKey,
+      JSON.stringify({
+        leftPaneWidth,
+        rightPaneWidth,
+      }),
+    );
+  }
+
+  function restorePaneLayout() {
+    const savedLayout = localStorage.getItem(paneLayoutStorageKey);
+    if (!savedLayout) {
+      return;
+    }
+
+    try {
+      const parsed = JSON.parse(savedLayout);
+      if (typeof parsed.leftPaneWidth === "number") {
+        leftPaneWidth = clamp(parsed.leftPaneWidth, minLeftPaneWidth, maxLeftPaneWidth);
+      }
+      if (typeof parsed.rightPaneWidth === "number") {
+        rightPaneWidth = clamp(parsed.rightPaneWidth, minRightPaneWidth, maxRightPaneWidth);
+      }
+    } catch (_error) {
+      localStorage.removeItem(paneLayoutStorageKey);
+    }
+  }
+
+  function applyPaneConstraints() {
+    const workspaceWidth = workspaceElement?.clientWidth ?? 0;
+    if (!workspaceWidth || viewportWidth <= 1180) {
+      return;
+    }
+
+    leftPaneWidth = clamp(leftPaneWidth, minLeftPaneWidth, maxLeftPaneWidth);
+    rightPaneWidth = clamp(rightPaneWidth, minRightPaneWidth, maxRightPaneWidth);
+
+    const rightWidth = rightPaneExpanded ? rightPaneWidth : collapsedRightPaneWidth;
+    const maxLeftFromViewport = workspaceWidth - rightWidth - minCenterPaneWidth;
+    leftPaneWidth = clamp(leftPaneWidth, minLeftPaneWidth, Math.max(minLeftPaneWidth, maxLeftFromViewport));
+
+    if (rightPaneExpanded) {
+      const maxRightFromViewport = workspaceWidth - leftPaneWidth - minCenterPaneWidth;
+      rightPaneWidth = clamp(rightPaneWidth, minRightPaneWidth, Math.max(minRightPaneWidth, maxRightFromViewport));
+    }
+  }
+
+  function updatePaneLayout(mutator) {
+    mutator();
+    applyPaneConstraints();
+    savePaneLayout();
+  }
+
+  function beginPaneResize(pane, event) {
+    if (viewportWidth <= 1180) {
+      return;
+    }
+
+    const workspaceWidth = workspaceElement?.clientWidth ?? 0;
+    if (!workspaceWidth) {
+      return;
+    }
+
+    const startX = event.clientX;
+    const startLeftWidth = leftPaneWidth;
+    const startRightWidth = rightPaneWidth;
+
+    const handlePointerMove = (moveEvent) => {
+      if (pane === "left") {
+        updatePaneLayout(() => {
+          leftPaneWidth = startLeftWidth + (moveEvent.clientX - startX);
+        });
+        return;
+      }
+
+      updatePaneLayout(() => {
+        rightPaneWidth = startRightWidth - (moveEvent.clientX - startX);
+      });
+    };
+
+    const stopResize = () => {
+      window.removeEventListener("pointermove", handlePointerMove);
+      window.removeEventListener("pointerup", stopResize);
+      window.removeEventListener("pointercancel", stopResize);
+      document.body.classList.remove("pane-resizing");
+      resizeCleanup = null;
+      savePaneLayout();
+    };
+
+    resizeCleanup?.();
+    resizeCleanup = stopResize;
+    document.body.classList.add("pane-resizing");
+    window.addEventListener("pointermove", handlePointerMove);
+    window.addEventListener("pointerup", stopResize);
+    window.addEventListener("pointercancel", stopResize);
   }
 
   async function openRepositoryAt(path, options = {}) {
@@ -898,6 +1012,8 @@
 
   onMount(() => {
     applyTheme(localStorage.getItem(themeStorageKey) ?? "dark");
+    restorePaneLayout();
+    applyPaneConstraints();
 
     const handleVisibilityChange = () => {
       appVisible = document.visibilityState === "visible";
@@ -911,30 +1027,52 @@
       void autoRefreshRepository();
     };
 
+    const handleResize = () => {
+      viewportWidth = window.innerWidth;
+      applyPaneConstraints();
+      savePaneLayout();
+    };
+
+    viewportWidth = window.innerWidth;
     appVisible = document.visibilityState === "visible";
     const intervalId = window.setInterval(() => {
       void autoRefreshRepository();
     }, autoRefreshIntervalMs);
     document.addEventListener("visibilitychange", handleVisibilityChange);
     window.addEventListener("focus", handleWindowFocus);
+    window.addEventListener("resize", handleResize);
 
     const savedPath = localStorage.getItem(lastRepositoryKey);
     if (!savedPath) {
       return () => {
+        resizeCleanup?.();
         window.clearInterval(intervalId);
         document.removeEventListener("visibilitychange", handleVisibilityChange);
         window.removeEventListener("focus", handleWindowFocus);
+        window.removeEventListener("resize", handleResize);
       };
     }
 
     void openRepositoryAt(savedPath, { remember: false, clearSavedOnError: true });
 
     return () => {
+      resizeCleanup?.();
       window.clearInterval(intervalId);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
       window.removeEventListener("focus", handleWindowFocus);
+      window.removeEventListener("resize", handleResize);
     };
   });
+
+  $: paneLayoutStyle =
+    viewportWidth <= 1180
+      ? undefined
+      : `--left-pane-width: ${leftPaneWidth}px; --right-pane-width: ${
+          rightPaneExpanded ? rightPaneWidth : collapsedRightPaneWidth
+        }px;`;
+  $: if (workspaceElement) {
+    applyPaneConstraints();
+  }
 
   $: changedEntries = repository ? repository.entries : [];
   $: if (repository && selectedStashIndex !== null) {
@@ -1055,7 +1193,7 @@
     onToggleTheme={toggleTheme}
   />
 
-  <main class:workspace-collapsed={!rightPaneExpanded} class="workspace">
+  <main bind:this={workspaceElement} class:workspace-collapsed={!rightPaneExpanded} class="workspace" style={paneLayoutStyle}>
     <SidebarPane
       {repository}
       {loading}
@@ -1075,6 +1213,14 @@
       onPopSelectedStash={popSelectedStash}
     />
 
+    <div
+      aria-label="Resize left pane"
+      class="pane-resizer pane-resizer-left"
+      on:pointerdown={(event) => beginPaneResize("left", event)}
+      role="separator"
+      tabindex="-1"
+    ></div>
+
     <HistoryPane
       {repository}
       {error}
@@ -1088,6 +1234,16 @@
       onSelectCommit={selectCommit}
       onCloseCommitDetail={closeCommitDetail}
     />
+
+    <div
+      aria-hidden={!rightPaneExpanded}
+      aria-label="Resize right pane"
+      class:pane-resizer-disabled={!rightPaneExpanded}
+      class="pane-resizer pane-resizer-right"
+      on:pointerdown={(event) => beginPaneResize("right", event)}
+      role="separator"
+      tabindex="-1"
+    ></div>
 
     <CommitPane
       {repository}
@@ -1262,13 +1418,52 @@
     min-height: 0;
     height: 100%;
     display: grid;
-    grid-template-columns: 246px minmax(0, 1fr) 332px;
+    grid-template-columns: var(--left-pane-width, 246px) 8px minmax(0, 1fr) 8px var(--right-pane-width, 332px);
     overflow: hidden;
     transition: grid-template-columns 160ms ease;
   }
 
   .workspace.workspace-collapsed {
-    grid-template-columns: 246px minmax(0, 1fr) 54px;
+    grid-template-columns: var(--left-pane-width, 246px) 8px minmax(0, 1fr) 8px 54px;
+  }
+
+  .pane-resizer {
+    position: relative;
+    min-width: 8px;
+    height: 100%;
+    cursor: col-resize;
+    touch-action: none;
+  }
+
+  .pane-resizer::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 50%;
+    width: 1px;
+    transform: translateX(-50%);
+    background: color-mix(in srgb, var(--panel-border) 78%, transparent);
+    transition: background 120ms ease, box-shadow 120ms ease;
+  }
+
+  .pane-resizer:hover::before {
+    background: color-mix(in srgb, var(--accent) 50%, var(--panel-border));
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 16%, transparent);
+  }
+
+  .pane-resizer.pane-resizer-disabled {
+    cursor: default;
+    pointer-events: none;
+  }
+
+  .pane-resizer.pane-resizer-disabled::before {
+    opacity: 0;
+  }
+
+  :global(body.pane-resizing) {
+    cursor: col-resize;
+    user-select: none;
   }
 
   .dialog-backdrop {
@@ -1402,6 +1597,10 @@
 
     .workspace.workspace-collapsed {
       grid-template-columns: 220px minmax(0, 1fr);
+    }
+
+    .pane-resizer {
+      display: none;
     }
   }
 
