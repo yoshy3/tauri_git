@@ -21,6 +21,10 @@ Tauri Git is a desktop Git client focused on a compact workflow:
 - Browse tags and jump from a tag to its commit in history
 - Checkout, create, and delete branches
 
+## Screenshot
+
+![screenshot](images\screenshot-1.png)
+
 ## Tech Stack
 
 - Frontend: Svelte + Vite
