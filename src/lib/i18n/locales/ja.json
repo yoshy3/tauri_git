@@ -16,6 +16,11 @@
   "topbar": {
     "subtitle": "ミニマルな Git クライアント",
     "language": "言語",
+    "open": "開く",
+    "opening": "開いています...",
+    "recent": "履歴",
+    "openRecent": "最近開いたリポジトリを開く",
+    "noRecentRepositories": "最近開いたリポジトリはありません。",
     "fetch": "Fetch",
     "pull": "Pull",
     "push": "Push",

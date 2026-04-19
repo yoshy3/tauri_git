@@ -1,18 +1,24 @@
 <script>
   import { _, locale } from "svelte-i18n";
+  import { tick } from "svelte";
   import { setAppLocale } from "../i18n";
 
   export let repository = null;
   export let loading = false;
   export let theme = "dark";
+  export let recentRepositoryPaths = [];
   export let topActions = [];
   export let implementedActions = [];
   export let activeAction = "";
   export let canResetSelectedCommit = false;
   export let onAction = () => {};
+  export let onSelectRepository = () => {};
+  export let onOpenRecentRepository = () => {};
   export let onResetSelectedCommit = () => {};
   export let onRefresh = () => {};
   export let onToggleTheme = () => {};
+  let recentMenuOpen = false;
+  let recentMenuElement;
 
   function actionKey(action) {
     return `topbar.${action.toLowerCase()}`;
@@ -40,14 +46,91 @@
 
   $: themeToggleLabel = theme === "dark" ? $_("topbar.switchToLight") : $_("topbar.switchToDark");
   $: themeCaption = $_("topbar.theme");
+
+  async function toggleRecentMenu() {
+    recentMenuOpen = !recentMenuOpen;
+    if (recentMenuOpen) {
+      await tick();
+      recentMenuElement?.querySelector("button")?.focus();
+    }
+  }
+
+  function closeRecentMenu() {
+    recentMenuOpen = false;
+  }
+
+  async function openRecent(path) {
+    closeRecentMenu();
+    await onOpenRecentRepository(path);
+  }
+
+  function handleDocumentPointerDown(event) {
+    if (!recentMenuOpen) {
+      return;
+    }
+
+    const target = event.target;
+    if (!(target instanceof Element)) {
+      return;
+    }
+
+    if (!target.closest(".open-split-button")) {
+      closeRecentMenu();
+    }
+  }
 </script>
 
+<svelte:document on:pointerdown={handleDocumentPointerDown} />
+
 <header class="topbar">
-  <div class="brand">
-    <span class="brand-mark">G</span>
-    <div>
-      <strong>Tauri Git</strong>
-      <p>{$_("topbar.subtitle")}</p>
+  <div class="topbar-leading">
+    <div class="brand">
+      <span class="brand-mark">G</span>
+      <div>
+        <strong>Tauri Git</strong>
+        <p>{$_("topbar.subtitle")}</p>
+      </div>
+    </div>
+
+    <div class="open-split-button">
+      <button class="toolbar-button toolbar-button-open" type="button" on:click={onSelectRepository} disabled={loading}>
+        <span class="button-icon-wrap">
+          <span class="button-icon" aria-hidden="true">
+            <svg class="toolbar-svg toolbar-svg-open" viewBox="0 0 16 16" fill="none">
+              <path d="M2.75 4.25h3l1.25 1.5h6.25v6.5H2.75z" />
+              <path d="M2.75 6.25h10.5" />
+            </svg>
+          </span>
+        </span>
+        <span class="button-label">{loading ? $_("topbar.opening") : $_("topbar.open")}</span>
+      </button>
+      <button
+        class="toolbar-button toolbar-button-split-toggle"
+        type="button"
+        aria-label={$_("topbar.openRecent")}
+        aria-expanded={recentMenuOpen}
+        on:click={toggleRecentMenu}
+        disabled={loading}
+      >
+        <span class="button-icon-wrap">
+          <span class="button-icon button-icon-chevron" aria-hidden="true">▾</span>
+        </span>
+      </button>
+
+      {#if recentMenuOpen}
+        <div bind:this={recentMenuElement} class="open-recent-menu">
+          {#if recentRepositoryPaths.length > 0}
+            {#each recentRepositoryPaths as path}
+              <button class="open-recent-item" type="button" on:click={() => openRecent(path)} title={path}>
+                <span class="open-recent-primary">{path.split("/").filter(Boolean).at(-1) ?? path}</span>
+                <span class="open-recent-secondary">{path}</span>
+              </button>
+            {/each}
+          {:else}
+            <div class="open-recent-empty">{$_("topbar.noRecentRepositories")}</div>
+          {/if}
+        </div>
+      {/if}
     </div>
   </div>
 
@@ -196,6 +279,8 @@
 
 <style>
   .topbar {
+    position: relative;
+    z-index: 20;
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -204,6 +289,13 @@
     background: var(--header-background);
     backdrop-filter: blur(20px);
     box-shadow: inset 0 -1px 0 rgba(255, 255, 255, 0.02);
+  }
+
+  .topbar-leading {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 0;
   }
 
   .brand {
@@ -276,6 +368,103 @@
     color: var(--text-primary);
     background: var(--accent-soft);
     box-shadow: inset 0 -2px 0 var(--accent);
+  }
+
+  .open-split-button {
+    position: relative;
+    z-index: 21;
+    display: inline-flex;
+    align-items: stretch;
+    gap: 0;
+    border-radius: 8px;
+  }
+
+  .toolbar-button-open {
+    min-width: 70px;
+    padding-right: 4px;
+    border-radius: 0;
+  }
+
+  .toolbar-button-split-toggle {
+    min-width: 24px;
+    width: 24px;
+    padding: 0;
+    justify-content: center;
+    gap: 0;
+    border-radius: 0;
+    position: relative;
+    margin-left: -8px;
+  }
+
+  .toolbar-button-split-toggle::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 12px;
+    bottom: 12px;
+    width: 1px;
+    background: color-mix(in srgb, var(--surface-border) 80%, transparent);
+  }
+
+  .button-icon-chevron {
+    font-size: 0.9rem;
+    line-height: 1;
+    align-items: center;
+    justify-content: center;
+    transform: translateY(0);
+  }
+
+  .open-recent-menu {
+    position: absolute;
+    top: calc(100% + 8px);
+    left: 0;
+    width: min(360px, 60vw);
+    max-height: 280px;
+    overflow: auto;
+    display: grid;
+    gap: 4px;
+    padding: 8px;
+    border: 1px solid var(--surface-border);
+    border-radius: 12px;
+    background: var(--panel-background);
+    box-shadow: var(--panel-shadow);
+    z-index: 22;
+  }
+
+  .open-recent-item {
+    width: 100%;
+    display: grid;
+    gap: 3px;
+    text-align: left;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    color: inherit;
+    padding: 8px 10px;
+  }
+
+  .open-recent-item:hover {
+    background: var(--hover-overlay-soft);
+  }
+
+  .open-recent-primary {
+    color: var(--text-primary);
+    font-size: 0.8rem;
+    font-weight: 600;
+  }
+
+  .open-recent-secondary {
+    color: var(--text-muted);
+    font-size: 0.7rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .open-recent-empty {
+    color: var(--text-muted);
+    font-size: 0.78rem;
+    padding: 8px 10px;
   }
 
   .locale-switcher {
@@ -409,6 +598,10 @@
     transform: translateY(0.5px);
   }
 
+  .toolbar-svg-open {
+    transform: translateY(0.5px);
+  }
+
   .toolbar-badge {
     position: absolute;
     top: -1px;
@@ -452,6 +645,14 @@
       flex-direction: column;
       padding: 12px 14px;
       gap: 10px;
+    }
+
+    .topbar-leading {
+      justify-content: space-between;
+    }
+
+    .open-recent-menu {
+      width: min(320px, calc(100vw - 28px));
     }
 
     .toolbar-cluster {

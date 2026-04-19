@@ -8,7 +8,6 @@
   export let selectedRef = null;
   export let stashBusyAction = "";
   export let menuOpenKey = "";
-  export let onSelectRepository = () => {};
   export let onSelectStash = () => {};
   export let onSelectTag = () => {};
   export let onOpenCreateTagDialog = () => {};
@@ -180,12 +179,6 @@
 </script>
 
 <aside class="sidebar">
-  <div class="sidebar-toolbar">
-    <button class="sidebar-tool" type="button" on:click={onSelectRepository} disabled={loading}>
-      {loading ? $_("sidebar.opening") : $_("sidebar.open")}
-    </button>
-  </div>
-
   <section class="sidebar-summary">
     {#if repository}
       <div class="sidebar-summary-top">
@@ -454,26 +447,9 @@
     border-right: 1px solid var(--row-border);
     background: var(--sidebar-background);
     display: grid;
-    grid-template-rows: auto auto auto 1fr;
+    grid-template-rows: auto auto 1fr;
     gap: 8px;
     overflow: hidden;
-  }
-
-  .sidebar-toolbar {
-    display: flex;
-  }
-
-  .sidebar-tool {
-    width: 100%;
-    border: 1px solid var(--surface-border);
-    border-radius: 10px;
-    background: var(--surface-background);
-    color: var(--text-muted);
-    padding: 9px 12px;
-    font-size: 0.76rem;
-    font-weight: 700;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
   }
 
   .sidebar-summary,

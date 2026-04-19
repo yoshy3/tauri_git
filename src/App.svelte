@@ -65,12 +65,15 @@
   let workspaceElement;
   let resizeCleanup = null;
   let viewportWidth = 0;
+  let recentRepositoryPaths = [];
 
   const topActions = ["Fetch", "Pull", "Push", "Stash", "Discard"];
   const implementedTopActions = ["Fetch", "Pull", "Push", "Stash", "Discard"];
   const lastRepositoryKey = "tauri-git:last-repository-path";
+  const repositoryHistoryKey = "tauri-git:repository-history";
   const themeStorageKey = "tauri-git:theme";
   const paneLayoutStorageKey = "tauri-git:pane-layout";
+  const maxRecentRepositories = 10;
   const historyBatchSize = 100;
   const autoRefreshIntervalMs = 2500;
   const minLeftPaneWidth = 180;
@@ -240,6 +243,67 @@
     }
   }
 
+  function loadRecentRepositoryPaths() {
+    const savedHistory = localStorage.getItem(repositoryHistoryKey);
+    if (!savedHistory) {
+      const lastPath = localStorage.getItem(lastRepositoryKey);
+      recentRepositoryPaths = lastPath ? [lastPath] : [];
+      return;
+    }
+
+    try {
+      const parsed = JSON.parse(savedHistory);
+      if (Array.isArray(parsed)) {
+        recentRepositoryPaths = parsed
+          .map((value) => String(value || "").trim())
+          .filter(Boolean)
+          .slice(0, maxRecentRepositories);
+        return;
+      }
+    } catch (_error) {
+      localStorage.removeItem(repositoryHistoryKey);
+    }
+
+    const lastPath = localStorage.getItem(lastRepositoryKey);
+    recentRepositoryPaths = lastPath ? [lastPath] : [];
+  }
+
+  function saveRecentRepositoryPaths() {
+    localStorage.setItem(repositoryHistoryKey, JSON.stringify(recentRepositoryPaths));
+  }
+
+  function rememberRepositoryPath(path) {
+    const trimmed = String(path || "").trim();
+    if (!trimmed) {
+      return;
+    }
+
+    recentRepositoryPaths = [
+      trimmed,
+      ...recentRepositoryPaths.filter((entry) => entry !== trimmed),
+    ].slice(0, maxRecentRepositories);
+    localStorage.setItem(lastRepositoryKey, trimmed);
+    saveRecentRepositoryPaths();
+  }
+
+  function forgetRepositoryPath(path) {
+    const trimmed = String(path || "").trim();
+    if (!trimmed) {
+      return;
+    }
+
+    recentRepositoryPaths = recentRepositoryPaths.filter((entry) => entry !== trimmed);
+    saveRecentRepositoryPaths();
+
+    if (localStorage.getItem(lastRepositoryKey) === trimmed) {
+      if (recentRepositoryPaths.length > 0) {
+        localStorage.setItem(lastRepositoryKey, recentRepositoryPaths[0]);
+      } else {
+        localStorage.removeItem(lastRepositoryKey);
+      }
+    }
+  }
+
   function applyPaneConstraints() {
     const workspaceWidth = workspaceElement?.clientWidth ?? 0;
     if (!workspaceWidth || viewportWidth <= 1180) {
@@ -340,12 +404,12 @@
     try {
       repository = await invoke("open_repository", { path: trimmed });
       if (remember) {
-        localStorage.setItem(lastRepositoryKey, repository.repo_path);
+        rememberRepositoryPath(repository.repo_path);
       }
       void loadCommitHistory(repository.repo_path);
     } catch (message) {
       if (remember || clearSavedOnError) {
-        localStorage.removeItem(lastRepositoryKey);
+        forgetRepositoryPath(trimmed);
       }
       error = String(message);
     } finally {
@@ -371,6 +435,10 @@
     }
 
     await openRepositoryAt(path);
+  }
+
+  async function openRecentRepository(path) {
+    await openRepositoryAt(path, { clearSavedOnError: true });
   }
 
   async function refreshRepository() {
@@ -1380,6 +1448,7 @@
   onMount(() => {
     applyTheme(localStorage.getItem(themeStorageKey) ?? "dark");
     restorePaneLayout();
+    loadRecentRepositoryPaths();
     applyPaneConstraints();
 
     const handleVisibilityChange = () => {
@@ -1429,7 +1498,7 @@
     window.addEventListener("focus", handleWindowFocus);
     window.addEventListener("resize", handleResize);
 
-    const savedPath = localStorage.getItem(lastRepositoryKey);
+    const savedPath = recentRepositoryPaths[0] ?? localStorage.getItem(lastRepositoryKey);
     if (!savedPath) {
       return () => {
         resizeCleanup?.();
@@ -1574,11 +1643,14 @@
     {repository}
     {loading}
     {theme}
+    recentRepositoryPaths={recentRepositoryPaths}
     {topActions}
     implementedActions={implementedTopActions}
     activeAction={topbarBusyAction}
     canResetSelectedCommit={Boolean(selectedCommitOid)}
     onAction={handleTopAction}
+    onSelectRepository={selectRepository}
+    onOpenRecentRepository={openRecentRepository}
     onResetSelectedCommit={() => openResetCommitDialog()}
     onRefresh={refreshRepository}
     onToggleTheme={toggleTheme}
@@ -1591,7 +1663,6 @@
       selectedStashIndex={selectedStashIndex}
       {selectedRef}
       stashBusyAction={stashBusyAction}
-      onSelectRepository={selectRepository}
       onSelectStash={(index) => (selectedStashIndex = index)}
       onSelectTag={selectTag}
       onOpenCreateTagDialog={openCreateTagDialog}
