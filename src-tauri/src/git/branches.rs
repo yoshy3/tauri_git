@@ -221,6 +221,60 @@ pub(crate) fn create_branch_from_source(
     Ok(())
 }
 
+pub(crate) fn rebase_current_branch_onto_reference(
+    repository: &Repository,
+    target_name: &str,
+    target_kind: &str,
+    target_remote_name: Option<&str>,
+) -> Result<(), String> {
+    let target_name = target_name.trim();
+    if target_name.is_empty() {
+        return Err(bilingual("rebase 対象が空です。", "The rebase target is empty."));
+    }
+
+    let current_branch = current_local_branch_name(repository).ok_or_else(|| {
+        bilingual(
+            "現在のローカルブランチを特定できません。",
+            "The current local branch could not be determined.",
+        )
+    })?;
+
+    let target_ref = match target_kind {
+        "local_branch" => {
+            if current_branch == target_name {
+                return Ok(());
+            }
+            target_name.to_string()
+        }
+        "remote_branch" => {
+            let remote_name = target_remote_name
+                .filter(|name| !name.trim().is_empty())
+                .ok_or_else(|| {
+                    bilingual(
+                        "リモート rebase 先にはリモート名が必要です。",
+                        "Rebasing onto a remote branch requires a remote name.",
+                    )
+                })?;
+            format!("{remote_name}/{target_name}")
+        }
+        _ => {
+            return Err(bilingual(
+                format!("未対応の rebase 対象種別です: {target_kind}"),
+                format!("Unsupported rebase target kind: {target_kind}"),
+            ))
+        }
+    };
+
+    let repo_root = repository_root(repository)?;
+    let mut command = git_command();
+    command
+        .current_dir(repo_root)
+        .arg("rebase")
+        .arg(&target_ref);
+
+    run_git_command(command, "git rebase")
+}
+
 
 pub(crate) fn delete_repository_branch(
     repository: &Repository,
@@ -303,5 +357,4 @@ pub(crate) fn delete_repository_branch(
 
     Ok(())
 }
-
 

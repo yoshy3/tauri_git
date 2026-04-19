@@ -74,6 +74,15 @@
     "create": "ブランチを作成",
     "creating": "作成中..."
   },
+  "rebaseDialog": {
+    "title": "現在のブランチを rebase",
+    "description": "{branch} を {target} の先頭へ rebase します。",
+    "targetLabel": "rebase 先",
+    "warning": "この操作はローカルのコミット履歴を書き換えます。競合が発生した場合はコマンドラインで解消してから更新してください。",
+    "confirm": "rebase を開始",
+    "rebasing": "rebase 中...",
+    "cancel": "キャンセル"
+  },
   "branchDelete": {
     "title": "ブランチを削除",
     "description": "{branch} を削除します。確認のため、下に完全なブランチ名を入力してください。",
@@ -130,6 +139,7 @@
     "tagActions": "タグ操作",
     "checkout": "Checkout",
     "newBranch": "新規ブランチ",
+    "rebase": "このブランチへ rebase",
     "newTag": "新規タグ",
     "deleteTag": "タグ削除",
     "cancel": "キャンセル",

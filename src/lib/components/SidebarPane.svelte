@@ -16,6 +16,7 @@
   export let onToggleMenu = () => {};
   export let onCheckoutReference = () => {};
   export let onCreateBranchFromReference = () => {};
+  export let onRebaseReference = () => {};
   export let onDeleteReference = () => {};
   export let onCancelSelectedStash = () => {};
   export let onApplySelectedStash = () => {};
@@ -232,6 +233,7 @@
                   {onToggleMenu}
                   {onCheckoutReference}
                   {onCreateBranchFromReference}
+                  {onRebaseReference}
                   {onDeleteReference}
                 />
               {/key}
@@ -279,6 +281,7 @@
                             {onToggleMenu}
                             {onCheckoutReference}
                             {onCreateBranchFromReference}
+                            {onRebaseReference}
                             {onDeleteReference}
                           />
                         {/key}

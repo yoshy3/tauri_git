@@ -36,6 +36,8 @@
   let branchDialogOpen = false;
   let branchNameDraft = "";
   let branchSwitchAfterCreate = true;
+  let rebaseDialogOpen = false;
+  let rebaseTargetRef = null;
   let tagDialogOpen = false;
   let tagNameDraft = "";
   let tagMessageDraft = "";
@@ -120,6 +122,7 @@
       Boolean(topbarBusyAction) ||
       Boolean(stashBusyAction) ||
       branchDialogOpen ||
+      rebaseDialogOpen ||
       tagDialogOpen ||
       deleteDialogOpen ||
       deleteTagDialogOpen ||
@@ -139,6 +142,11 @@
     branchDialogOpen = false;
     branchNameDraft = "";
     branchSwitchAfterCreate = true;
+  }
+
+  function resetRebaseDialog() {
+    rebaseDialogOpen = false;
+    rebaseTargetRef = null;
   }
 
   function resetDeleteDialog() {
@@ -313,6 +321,7 @@
       rightPaneExpanded = false;
       rightPaneTab = "commit";
     }
+    resetRebaseDialog();
     resetTagDialog();
     resetDeleteTagDialog();
     loading = true;
@@ -373,6 +382,7 @@
       selectedCommitDetailLoading = false;
       closeBranchMenu();
       resetPushDialog();
+      resetRebaseDialog();
       resetTagDialog();
       resetDeleteTagDialog();
       rightPaneExpanded = false;
@@ -1046,6 +1056,52 @@
     branchDialogOpen = true;
   }
 
+  function openRebaseDialog(ref = selectedRef) {
+    if (!repository) {
+      error = t("errors.openRepositoryFirst");
+      return;
+    }
+
+    if (!ref?.canRebase) {
+      return;
+    }
+
+    selectedRef = ref;
+    closeBranchMenu();
+    rebaseTargetRef = ref;
+    rebaseDialogOpen = true;
+    error = "";
+  }
+
+  async function confirmRebaseReference() {
+    if (!repository || !rebaseTargetRef?.canRebase) {
+      return;
+    }
+
+    loading = true;
+    error = "";
+
+    try {
+      repository = await invoke("rebase_current_branch", {
+        path: repository.repo_path,
+        targetName: rebaseTargetRef.name,
+        targetKind: rebaseTargetRef.kind,
+        targetRemoteName: rebaseTargetRef.remoteName ?? null,
+      });
+      selectedRef = rebaseTargetRef;
+      pendingRefCommitOid = "";
+      selectedStashIndex = null;
+      resetRebaseDialog();
+      rightPaneExpanded = false;
+      rightPaneTab = "commit";
+      void loadCommitHistory(repository.repo_path);
+    } catch (message) {
+      error = String(message);
+    } finally {
+      loading = false;
+    }
+  }
+
   async function createBranchFromSelectedRef() {
     if (!repository) {
       error = t("errors.openRepositoryFirst");
@@ -1258,12 +1314,32 @@
       savePaneLayout();
     };
 
+    const handleGlobalPointerDown = (event) => {
+      const target = event.target;
+      if (!(target instanceof Element)) {
+        return;
+      }
+
+      if (branchMenuOpenKey && !target.closest(".tree-item-actions")) {
+        closeBranchMenu();
+      }
+
+      if (
+        selectedStashIndex !== null &&
+        !target.closest(".stash-actions") &&
+        !target.closest(".tree-item-stack")
+      ) {
+        selectedStashIndex = null;
+      }
+    };
+
     viewportWidth = window.innerWidth;
     appVisible = document.visibilityState === "visible";
     const intervalId = window.setInterval(() => {
       void autoRefreshRepository();
     }, autoRefreshIntervalMs);
     document.addEventListener("visibilitychange", handleVisibilityChange);
+    document.addEventListener("pointerdown", handleGlobalPointerDown);
     window.addEventListener("focus", handleWindowFocus);
     window.addEventListener("resize", handleResize);
 
@@ -1273,6 +1349,7 @@
         resizeCleanup?.();
         window.clearInterval(intervalId);
         document.removeEventListener("visibilitychange", handleVisibilityChange);
+        document.removeEventListener("pointerdown", handleGlobalPointerDown);
         window.removeEventListener("focus", handleWindowFocus);
         window.removeEventListener("resize", handleResize);
       };
@@ -1284,6 +1361,7 @@
       resizeCleanup?.();
       window.clearInterval(intervalId);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
+      document.removeEventListener("pointerdown", handleGlobalPointerDown);
       window.removeEventListener("focus", handleWindowFocus);
       window.removeEventListener("resize", handleResize);
     };
@@ -1434,6 +1512,7 @@
       onToggleMenu={(key) => (branchMenuOpenKey = key)}
       onCheckoutReference={checkoutReference}
       onCreateBranchFromReference={openCreateBranchDialog}
+      onRebaseReference={openRebaseDialog}
       onDeleteReference={deleteReference}
       onCancelSelectedStash={() => (selectedStashIndex = null)}
       onApplySelectedStash={applySelectedStash}
@@ -1515,6 +1594,33 @@
           </button>
           <button class="dialog-button" type="button" on:click={createBranchFromSelectedRef} disabled={loading}>
             {loading ? t("branchDialog.creating") : t("branchDialog.create")}
+          </button>
+        </div>
+      </section>
+    </div>
+  {/if}
+
+  {#if rebaseDialogOpen && rebaseTargetRef && repository}
+    <div class="dialog-backdrop" role="presentation" on:click={(event) => event.target === event.currentTarget && !loading && resetRebaseDialog()}>
+      <section class="dialog-card" role="dialog" aria-modal="true" aria-labelledby="rebase-dialog-title">
+        <div class="dialog-copy">
+          <h2 id="rebase-dialog-title">{t("rebaseDialog.title")}</h2>
+          <p>{t("rebaseDialog.description", { branch: repository.branch, target: rebaseTargetRef.displayName })}</p>
+        </div>
+
+        <div class="dialog-warning">
+          <span class="dialog-warning-label">{t("rebaseDialog.targetLabel")}</span>
+          <code>{rebaseTargetRef.displayName}</code>
+        </div>
+
+        <p class="dialog-helper">{t("rebaseDialog.warning")}</p>
+
+        <div class="dialog-actions">
+          <button class="dialog-button dialog-button-muted" type="button" on:click={resetRebaseDialog} disabled={loading}>
+            {t("rebaseDialog.cancel")}
+          </button>
+          <button class="dialog-button" type="button" on:click={confirmRebaseReference} disabled={loading}>
+            {loading ? t("rebaseDialog.rebasing") : t("rebaseDialog.confirm")}
           </button>
         </div>
       </section>

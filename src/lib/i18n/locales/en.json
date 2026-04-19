@@ -74,6 +74,15 @@
     "create": "Create Branch",
     "creating": "Creating..."
   },
+  "rebaseDialog": {
+    "title": "Rebase Current Branch",
+    "description": "Rebase {branch} onto {target}.",
+    "targetLabel": "Rebase target",
+    "warning": "This rewrites local commit history. If conflicts occur, resolve them from the command line before refreshing.",
+    "confirm": "Start Rebase",
+    "rebasing": "Rebasing...",
+    "cancel": "Cancel"
+  },
   "branchDelete": {
     "title": "Delete Branch",
     "description": "This action will delete {branch}. Type the full branch name below to confirm.",
@@ -130,6 +139,7 @@
     "tagActions": "Tag actions",
     "checkout": "Checkout",
     "newBranch": "New Branch",
+    "rebase": "Rebase Onto",
     "newTag": "New Tag",
     "deleteTag": "Delete Tag",
     "cancel": "Cancel",

@@ -142,6 +142,26 @@ pub(crate) async fn create_branch(
 }
 
 #[tauri::command]
+pub(crate) async fn rebase_current_branch(
+    path: String,
+    target_name: String,
+    target_kind: String,
+    target_remote_name: Option<String>,
+) -> Result<GitStatusResponse, String> {
+    run_blocking(move || {
+        let mut repository = git::open_repo(&path)?;
+        git::rebase_current_branch_onto_reference(
+            &repository,
+            &target_name,
+            &target_kind,
+            target_remote_name.as_deref(),
+        )?;
+        git::build_repository_status(&mut repository)
+    })
+    .await
+}
+
+#[tauri::command]
 pub(crate) async fn delete_branch(
     path: String,
     branch_name: String,

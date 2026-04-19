@@ -9,6 +9,7 @@
   export let onToggleMenu = () => {};
   export let onCheckoutReference = () => {};
   export let onCreateBranchFromReference = () => {};
+  export let onRebaseReference = () => {};
   export let onDeleteReference = () => {};
 
   function nodeMenuKey(node) {
@@ -36,6 +37,7 @@
       displayName: remoteName ? `${remoteName}/${node.fullName}` : node.fullName,
       canCheckout: true,
       canCreateBranch: true,
+      canRebase: true,
       canDelete: true,
     };
   }
@@ -81,6 +83,11 @@
     onToggleMenu("");
     onDeleteReference(branchRef(node));
   }
+
+  function rebaseBranch(node) {
+    onToggleMenu("");
+    onRebaseReference(branchRef(node));
+  }
 </script>
 
 <ul class="branch-tree-list">
@@ -124,6 +131,14 @@
                 <button class="tree-item-menu-button" type="button" on:click={() => createBranch(node)} disabled={loading}>
                   {$_("sidebar.newBranch")}
                 </button>
+                <button
+                  class="tree-item-menu-button"
+                  type="button"
+                  on:click={() => rebaseBranch(node)}
+                  disabled={loading || (!remoteName && isCurrentBranch(node))}
+                >
+                  {$_("sidebar.rebase")}
+                </button>
                 <button class="tree-item-menu-button tree-item-menu-button-danger" type="button" on:click={() => deleteBranch(node)} disabled={loading || (!remoteName && isCurrentBranch(node))}>
                   {$_("branchDelete.delete")}
                 </button>
@@ -149,6 +164,7 @@
               {onToggleMenu}
               {onCheckoutReference}
               {onCreateBranchFromReference}
+              {onRebaseReference}
               {onDeleteReference}
             />
           </div>
