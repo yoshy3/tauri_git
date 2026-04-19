@@ -19,7 +19,7 @@ Tauri Git is a desktop Git client focused on a compact workflow:
 - Show pending pull / push commit counts in the top bar and next to local branches in the sidebar
 - Browse branches and remotes in a tree view
 - Browse tags and jump from a tag to its commit in history
-- Checkout, create, and delete branches
+- Checkout, create, rebase, reset, and delete branches
 
 ## Screenshot
 
@@ -47,6 +47,7 @@ Tauri Git is a desktop Git client focused on a compact workflow:
 - Commit detail panel with author / committer / refs / parents / changed files
 - Side-by-side diff dialog from commit details
 - Side-by-side diff dialog from the changes panel
+- `Reset` action from commit details and the top bar, with `soft` / `mixed` / `hard` selection
 - Commit creation from the changes panel
 - Commit amend from the changes panel, with previous summary / description prefilled
 - Warning when amending a commit that has already been pushed
@@ -59,7 +60,9 @@ Tauri Git is a desktop Git client focused on a compact workflow:
 - Local and remote branch tree display with `/`-based nesting
 - Branch checkout from local and remote refs
 - Branch creation dialog with optional auto-switch
+- Rebase current branch onto a selected local or remote branch
 - Branch delete dialog implemented in WebView
+- Reset current branch to a selected commit with `soft` / `mixed` / `hard`
 - Remote branch deletion support
 - Safe delete confirmation with branch-name input
 - Optional force delete for unmerged local branches
