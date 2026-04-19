@@ -275,6 +275,46 @@ pub(crate) fn rebase_current_branch_onto_reference(
     run_git_command(command, "git rebase")
 }
 
+pub(crate) fn reset_current_branch_to_commit(
+    repository: &Repository,
+    target: &str,
+    reset_mode: &str,
+) -> Result<(), String> {
+    let target = target.trim();
+    if target.is_empty() {
+        return Err(bilingual("reset 対象が空です。", "The reset target is empty."));
+    }
+
+    current_local_branch_name(repository).ok_or_else(|| {
+        bilingual(
+            "現在のローカルブランチを特定できません。",
+            "The current local branch could not be determined.",
+        )
+    })?;
+
+    let mode_flag = match reset_mode.trim() {
+        "soft" => "--soft",
+        "mixed" => "--mixed",
+        "hard" => "--hard",
+        other => {
+            return Err(bilingual(
+                format!("未対応の reset モードです: {other}"),
+                format!("Unsupported reset mode: {other}"),
+            ))
+        }
+    };
+
+    let repo_root = repository_root(repository)?;
+    let mut command = git_command();
+    command
+        .current_dir(repo_root)
+        .arg("reset")
+        .arg(mode_flag)
+        .arg(target);
+
+    run_git_command(command, "git reset")
+}
+
 
 pub(crate) fn delete_repository_branch(
     repository: &Repository,
@@ -357,4 +397,3 @@ pub(crate) fn delete_repository_branch(
 
     Ok(())
 }
-

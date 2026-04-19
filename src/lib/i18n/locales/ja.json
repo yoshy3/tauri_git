@@ -21,6 +21,7 @@
     "push": "Push",
     "stash": "Stash",
     "discard": "破棄",
+    "reset": "Reset",
     "pop": "Pop",
     "refresh": "更新",
     "syncing": "同期中...",
@@ -82,6 +83,34 @@
     "confirm": "rebase を開始",
     "rebasing": "rebase 中...",
     "cancel": "キャンセル"
+  },
+  "resetDialog": {
+    "title": "現在のブランチを reset",
+    "description": "{branch} を {target} へ reset します。",
+    "targetLabel": "reset 対象",
+    "modeLabel": "reset モード",
+    "confirm": "reset を実行",
+    "resetting": "reset 中...",
+    "cancel": "キャンセル",
+    "modes": {
+      "soft": {
+        "label": "Soft",
+        "description": "HEAD だけを移動し、index と working tree の変更は staged のまま残します。"
+      },
+      "mixed": {
+        "label": "Mixed",
+        "description": "HEAD と index を戻し、working tree の変更は残します。"
+      },
+      "hard": {
+        "label": "Hard",
+        "description": "HEAD を戻し、index と working tree の変更を破棄します。"
+      }
+    },
+    "warnings": {
+      "soft": "ブランチの位置だけが移動し、staged / unstaged の変更はそのまま残ります。",
+      "mixed": "ブランチ位置と index は戻りますが、working tree の変更は残ります。",
+      "hard": "未コミットの index / working tree の変更を完全に破棄します。"
+    }
   },
   "branchDelete": {
     "title": "ブランチを削除",
@@ -182,6 +211,7 @@
       "author": "作成者",
       "committer": "コミッター",
       "close": "詳細を閉じる",
+      "reset": "Reset",
       "refs": "参照",
       "sha": "SHA",
       "parents": "親コミット",

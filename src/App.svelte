@@ -38,6 +38,9 @@
   let branchSwitchAfterCreate = true;
   let rebaseDialogOpen = false;
   let rebaseTargetRef = null;
+  let resetDialogOpen = false;
+  let resetTargetCommit = null;
+  let resetModeDraft = "mixed";
   let tagDialogOpen = false;
   let tagNameDraft = "";
   let tagMessageDraft = "";
@@ -123,6 +126,7 @@
       Boolean(stashBusyAction) ||
       branchDialogOpen ||
       rebaseDialogOpen ||
+      resetDialogOpen ||
       tagDialogOpen ||
       deleteDialogOpen ||
       deleteTagDialogOpen ||
@@ -147,6 +151,12 @@
   function resetRebaseDialog() {
     rebaseDialogOpen = false;
     rebaseTargetRef = null;
+  }
+
+  function resetResetDialog() {
+    resetDialogOpen = false;
+    resetTargetCommit = null;
+    resetModeDraft = "mixed";
   }
 
   function resetDeleteDialog() {
@@ -322,6 +332,7 @@
       rightPaneTab = "commit";
     }
     resetRebaseDialog();
+    resetResetDialog();
     resetTagDialog();
     resetDeleteTagDialog();
     loading = true;
@@ -383,6 +394,7 @@
       closeBranchMenu();
       resetPushDialog();
       resetRebaseDialog();
+      resetResetDialog();
       resetTagDialog();
       resetDeleteTagDialog();
       rightPaneExpanded = false;
@@ -1102,6 +1114,80 @@
     }
   }
 
+  function openResetCommitDialog(commit = selectedCommitDetail) {
+    if (!repository) {
+      error = t("errors.openRepositoryFirst");
+      return;
+    }
+
+    const targetCommit =
+      commit?.oid
+        ? commit
+        : selectedCommitOid
+          ? selectedCommitDetail?.oid === selectedCommitOid
+            ? selectedCommitDetail
+            : historyCommits.find((entry) => entry.oid === selectedCommitOid) ?? null
+          : null;
+
+    if (!targetCommit?.oid) {
+      return;
+    }
+
+    closeBranchMenu();
+    resetTargetCommit = {
+      oid: targetCommit.oid,
+      id: targetCommit.id ?? targetCommit.oid.slice(0, 7),
+      summary: targetCommit.summary ?? "",
+    };
+    resetModeDraft = "mixed";
+    resetDialogOpen = true;
+    error = "";
+  }
+
+  function resetDialogDescription() {
+    if (!repository || !resetTargetCommit) {
+      return "";
+    }
+
+    return t("resetDialog.description", {
+      branch: repository.branch,
+      target: resetTargetCommit.id,
+    });
+  }
+
+  function resetModeDescription(mode) {
+    return t(`resetDialog.modes.${mode}.description`);
+  }
+
+  async function confirmResetCommit() {
+    if (!repository || !resetTargetCommit?.oid) {
+      return;
+    }
+
+    loading = true;
+    error = "";
+
+    try {
+      repository = await invoke("reset_current_branch", {
+        path: repository.repo_path,
+        target: resetTargetCommit.oid,
+        resetMode: resetModeDraft,
+      });
+      selectedCommitOid = resetTargetCommit.oid;
+      selectedCommitDetail = null;
+      selectedStashIndex = null;
+      pendingRefCommitOid = "";
+      resetResetDialog();
+      rightPaneExpanded = false;
+      rightPaneTab = "commit";
+      void loadCommitHistory(repository.repo_path, { preserveSelection: true });
+    } catch (message) {
+      error = String(message);
+    } finally {
+      loading = false;
+    }
+  }
+
   async function createBranchFromSelectedRef() {
     if (!repository) {
       error = t("errors.openRepositoryFirst");
@@ -1491,7 +1577,9 @@
     {topActions}
     implementedActions={implementedTopActions}
     activeAction={topbarBusyAction}
+    canResetSelectedCommit={Boolean(selectedCommitOid)}
     onAction={handleTopAction}
+    onResetSelectedCommit={() => openResetCommitDialog()}
     onRefresh={refreshRepository}
     onToggleTheme={toggleTheme}
   />
@@ -1538,6 +1626,7 @@
       {selectedCommitDetail}
       {selectedCommitDetailLoading}
       onSelectCommit={selectCommit}
+      onOpenResetCommitDialog={openResetCommitDialog}
       onCloseCommitDetail={closeCommitDetail}
     />
 
@@ -1621,6 +1710,45 @@
           </button>
           <button class="dialog-button" type="button" on:click={confirmRebaseReference} disabled={loading}>
             {loading ? t("rebaseDialog.rebasing") : t("rebaseDialog.confirm")}
+          </button>
+        </div>
+      </section>
+    </div>
+  {/if}
+
+  {#if resetDialogOpen && resetTargetCommit && repository}
+    <div class="dialog-backdrop" role="presentation" on:click={(event) => event.target === event.currentTarget && !loading && resetResetDialog()}>
+      <section class="dialog-card" role="dialog" aria-modal="true" aria-labelledby="reset-dialog-title">
+        <div class="dialog-copy">
+          <h2 id="reset-dialog-title">{t("resetDialog.title")}</h2>
+          <p>{resetDialogDescription()}</p>
+        </div>
+
+        <div class="dialog-warning">
+          <span class="dialog-warning-label">{t("resetDialog.targetLabel")}</span>
+          <code>{resetTargetCommit.id} {resetTargetCommit.summary ? `- ${resetTargetCommit.summary}` : ""}</code>
+        </div>
+
+        <div class="dialog-radio-group" role="radiogroup" aria-label={t("resetDialog.modeLabel")}>
+          {#each ["soft", "mixed", "hard"] as mode}
+            <label class:dialog-radio-option-danger={mode === "hard"} class="dialog-radio-option">
+              <input type="radio" name="reset-mode" bind:group={resetModeDraft} value={mode} disabled={loading} />
+              <span class="dialog-radio-copy">
+                <strong>{t(`resetDialog.modes.${mode}.label`)}</strong>
+                <span>{resetModeDescription(mode)}</span>
+              </span>
+            </label>
+          {/each}
+        </div>
+
+        <p class="dialog-helper">{t(`resetDialog.warnings.${resetModeDraft}`)}</p>
+
+        <div class="dialog-actions">
+          <button class="dialog-button dialog-button-muted" type="button" on:click={resetResetDialog} disabled={loading}>
+            {t("resetDialog.cancel")}
+          </button>
+          <button class:dialog-button-danger={resetModeDraft === "hard"} class="dialog-button" type="button" on:click={confirmResetCommit} disabled={loading}>
+            {loading ? t("resetDialog.resetting") : t("resetDialog.confirm")}
           </button>
         </div>
       </section>
@@ -1963,6 +2091,45 @@
     border-color: var(--input-border-focus);
     box-shadow: var(--focus-ring);
     background: var(--input-background-focus);
+  }
+
+  .dialog-radio-group {
+    display: grid;
+    gap: 8px;
+  }
+
+  .dialog-radio-option {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+    padding: 10px 12px;
+    border: 1px solid var(--surface-border);
+    border-radius: 10px;
+    background: var(--surface-background);
+  }
+
+  .dialog-radio-option-danger {
+    border-color: color-mix(in srgb, var(--danger-border) 65%, var(--surface-border));
+  }
+
+  .dialog-radio-option input[type="radio"] {
+    margin-top: 2px;
+  }
+
+  .dialog-radio-copy {
+    display: grid;
+    gap: 3px;
+  }
+
+  .dialog-radio-copy strong {
+    color: var(--text-primary);
+    font-size: 0.82rem;
+  }
+
+  .dialog-radio-copy span {
+    color: var(--text-secondary);
+    font-size: 0.76rem;
+    line-height: 1.4;
   }
 
   .dialog-checkbox {

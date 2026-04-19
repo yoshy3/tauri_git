@@ -8,7 +8,9 @@
   export let topActions = [];
   export let implementedActions = [];
   export let activeAction = "";
+  export let canResetSelectedCommit = false;
   export let onAction = () => {};
+  export let onResetSelectedCommit = () => {};
   export let onRefresh = () => {};
   export let onToggleTheme = () => {};
 
@@ -105,6 +107,17 @@
           <span class="button-label">{activeAction === action ? $_("topbar.syncing") : $_(actionKey(action))}</span>
         </button>
       {/each}
+      <button class="toolbar-button" disabled={!repository || loading || !canResetSelectedCommit} on:click={onResetSelectedCommit}>
+        <span class="button-icon-wrap">
+          <span class="button-icon" aria-hidden="true">
+            <svg class="toolbar-svg toolbar-svg-reset" viewBox="0 0 16 16" fill="none">
+              <path d="M4.25 5.5A4.75 4.75 0 1 1 3.5 8" />
+              <path d="M3.5 3.75v3h3" />
+            </svg>
+          </span>
+        </span>
+        <span class="button-label">{$_("topbar.reset")}</span>
+      </button>
       <button class:active={activeAction === "Refresh"} class="toolbar-button" on:click={onRefresh} disabled={!repository || loading}>
         <span class="button-icon-wrap">
           <span class="button-icon" aria-hidden="true">
@@ -389,6 +402,10 @@
   }
 
   .toolbar-svg-refresh {
+    transform: translateY(0.5px);
+  }
+
+  .toolbar-svg-reset {
     transform: translateY(0.5px);
   }
 

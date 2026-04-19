@@ -28,7 +28,7 @@ mod worktree;
 
 pub(crate) use branches::{
     checkout_repository_branch, create_branch_from_source, delete_repository_branch,
-    rebase_current_branch_onto_reference,
+    rebase_current_branch_onto_reference, reset_current_branch_to_commit,
 };
 use branches::{
     current_local_branch_name, load_branch_upstream_name, load_branch_upstream_sync_counts,

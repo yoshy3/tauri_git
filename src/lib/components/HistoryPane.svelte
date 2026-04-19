@@ -13,6 +13,7 @@
   export let selectedCommitDetail = null;
   export let selectedCommitDetailLoading = false;
   export let onSelectCommit = () => {};
+  export let onOpenResetCommitDialog = () => {};
   export let onCloseCommitDetail = () => {};
   let searchQuery = "";
 
@@ -474,11 +475,11 @@
       {:else if selectedCommitDetail}
         <div class="commit-details-header">
           <div class="commit-details-header-top">
-            <div class="commit-details-party-grid">
-              <div class="commit-party-card">
-                <div class="commit-party-label">{$_("history.details.author")}</div>
-                <div class="commit-party-main">
-                  <span class="commit-party-avatar">{initials(selectedCommitDetail.author.name)}</span>
+              <div class="commit-details-party-grid">
+                <div class="commit-party-card">
+                  <div class="commit-party-label">{$_("history.details.author")}</div>
+                  <div class="commit-party-main">
+                    <span class="commit-party-avatar">{initials(selectedCommitDetail.author.name)}</span>
                   <div class="commit-party-copy">
                     <strong>{selectedCommitDetail.author.name}</strong>
                     <span>{selectedCommitDetail.author.email}</span>
@@ -487,10 +488,10 @@
                 </div>
               </div>
 
-              <div class="commit-party-card">
-                <div class="commit-party-label">{$_("history.details.committer")}</div>
-                <div class="commit-party-main">
-                  <span class="commit-party-avatar">{initials(selectedCommitDetail.committer.name)}</span>
+                <div class="commit-party-card">
+                  <div class="commit-party-label">{$_("history.details.committer")}</div>
+                  <div class="commit-party-main">
+                    <span class="commit-party-avatar">{initials(selectedCommitDetail.committer.name)}</span>
                   <div class="commit-party-copy">
                     <strong>{selectedCommitDetail.committer.name}</strong>
                     <span>{selectedCommitDetail.committer.email}</span>
@@ -500,10 +501,15 @@
               </div>
             </div>
 
-            <button class="commit-details-close" type="button" aria-label={$_("history.details.close")} on:click={onCloseCommitDetail}>
-              ×
-            </button>
-          </div>
+              <div class="commit-details-actions">
+                <button class="commit-detail-action" type="button" on:click={() => onOpenResetCommitDialog(selectedCommitDetail)}>
+                  {$_("history.details.reset")}
+                </button>
+                <button class="commit-details-close" type="button" aria-label={$_("history.details.close")} on:click={onCloseCommitDetail}>
+                  ×
+                </button>
+              </div>
+            </div>
 
           <div class="commit-detail-meta">
             <div class="commit-detail-meta-row">
@@ -1059,6 +1065,29 @@
   }
 
   .commit-details-close:hover {
+    background: var(--surface-background-hover);
+  }
+
+  .commit-details-actions {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+
+  .commit-detail-action {
+    flex: 0 0 auto;
+    border: 1px solid var(--surface-border);
+    border-radius: 8px;
+    background: var(--surface-background-strong);
+    color: var(--text-secondary);
+    padding: 6px 10px;
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .commit-detail-action:hover {
     background: var(--surface-background-hover);
   }
 

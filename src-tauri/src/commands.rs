@@ -162,6 +162,20 @@ pub(crate) async fn rebase_current_branch(
 }
 
 #[tauri::command]
+pub(crate) async fn reset_current_branch(
+    path: String,
+    target: String,
+    reset_mode: String,
+) -> Result<GitStatusResponse, String> {
+    run_blocking(move || {
+        let mut repository = git::open_repo(&path)?;
+        git::reset_current_branch_to_commit(&repository, &target, &reset_mode)?;
+        git::build_repository_status(&mut repository)
+    })
+    .await
+}
+
+#[tauri::command]
 pub(crate) async fn delete_branch(
     path: String,
     branch_name: String,

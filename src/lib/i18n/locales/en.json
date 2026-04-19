@@ -26,6 +26,7 @@
     "push": "Push",
     "stash": "Stash",
     "discard": "Discard",
+    "reset": "Reset",
     "pop": "Pop",
     "refresh": "Refresh",
     "syncing": "Syncing..."
@@ -82,6 +83,34 @@
     "confirm": "Start Rebase",
     "rebasing": "Rebasing...",
     "cancel": "Cancel"
+  },
+  "resetDialog": {
+    "title": "Reset Current Branch",
+    "description": "Reset {branch} to {target}.",
+    "targetLabel": "Reset target",
+    "modeLabel": "Reset mode",
+    "confirm": "Reset Branch",
+    "resetting": "Resetting...",
+    "cancel": "Cancel",
+    "modes": {
+      "soft": {
+        "label": "Soft",
+        "description": "Move HEAD only and keep both the index and working tree changes staged."
+      },
+      "mixed": {
+        "label": "Mixed",
+        "description": "Move HEAD and reset the index, while keeping working tree changes."
+      },
+      "hard": {
+        "label": "Hard",
+        "description": "Move HEAD and discard both index and working tree changes."
+      }
+    },
+    "warnings": {
+      "soft": "The branch pointer will move, but your staged and unstaged changes will stay as they are.",
+      "mixed": "The branch pointer and index will be reset, but your working tree changes will remain.",
+      "hard": "This permanently discards uncommitted index and working tree changes."
+    }
   },
   "branchDelete": {
     "title": "Delete Branch",
@@ -182,6 +211,7 @@
       "author": "Author",
       "committer": "Committer",
       "close": "Close details",
+      "reset": "Reset",
       "refs": "Refs",
       "sha": "SHA",
       "parents": "Parents",
