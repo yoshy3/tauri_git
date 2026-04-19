@@ -35,6 +35,7 @@ Tauri Git is a desktop Git client focused on a compact workflow:
 ## Current Features
 
 - Repository picker and last-opened repository restore
+- Recent repository history in the top-bar `Open` split button
 - Auto-refresh when repository files or refs change
 - Working tree status list
 - Commit history with labels for local, remote, and tag refs
@@ -50,6 +51,7 @@ Tauri Git is a desktop Git client focused on a compact workflow:
 - `Reset` action from commit details and the top bar, with `soft` / `mixed` / `hard` selection
 - Commit creation from the changes panel
 - Commit amend from the changes panel, with previous summary / description prefilled
+- Collapsed changes panel button with changed-file count badge
 - Warning when amending a commit that has already been pushed
 - Stash create / apply / pop
 - Stash selection and apply / pop from the sidebar
@@ -63,6 +65,7 @@ Tauri Git is a desktop Git client focused on a compact workflow:
 - Rebase current branch onto a selected local or remote branch
 - Branch delete dialog implemented in WebView
 - Reset current branch to a selected commit with `soft` / `mixed` / `hard`
+- Commit history ordering tuned to keep the graph more compact
 - Remote branch deletion support
 - Safe delete confirmation with branch-name input
 - Optional force delete for unmerged local branches
