@@ -264,11 +264,14 @@
 
 <aside class:collapsed-pane={!expanded} class="right-pane">
   {#if !expanded}
-    <button class:attention={changedEntries.length > 0} class="pane-toggle" on:click={onToggle}>
-      <span class="pane-toggle-label">
-        {changedEntries.length > 0
-          ? $_("commit.openPanelWithCount", { values: { count: changedEntries.length } })
-          : $_("commit.openPanel")}
+    <button class="pane-toggle" on:click={onToggle}>
+      <span class="pane-toggle-content">
+        <span class="pane-toggle-label">{$_("commit.openPanel")}</span>
+        {#if changedEntries.length > 0}
+          <span class="pane-toggle-badge" aria-label={$_("commit.filesTitle", { values: { count: changedEntries.length } })}>
+            {changedEntries.length}
+          </span>
+        {/if}
       </span>
     </button>
   {:else}
@@ -636,22 +639,42 @@
     overflow: hidden;
   }
 
-  .pane-toggle.attention {
-    background: linear-gradient(180deg, var(--accent-strong), var(--accent-strong-2));
-    border-color: var(--accent-soft-border);
-    color: var(--accent-contrast);
-    box-shadow: 0 0 0 1px rgba(88, 161, 237, 0.16), 0 8px 20px rgba(15, 88, 160, 0.28);
+  .pane-toggle-content {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
   }
 
   .pane-toggle-label {
     display: inline-block;
   }
 
+  .pane-toggle-badge {
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    background: #e5484d;
+    color: #fff8f8;
+    font-size: 0.64rem;
+    font-weight: 800;
+    line-height: 1;
+    letter-spacing: 0;
+    box-shadow: 0 0 0 2px var(--surface-background-strong);
+  }
+
+  .collapsed-pane .pane-toggle-content {
+    transform: rotate(90deg);
+    transform-origin: center;
+  }
+
   .collapsed-pane .pane-toggle-label {
     line-height: 1;
     white-space: nowrap;
-    transform: rotate(90deg);
-    transform-origin: center;
     letter-spacing: 0.08em;
   }
 
