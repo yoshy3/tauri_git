@@ -28,7 +28,6 @@
     remotes: true,
     tags: false,
     stashes: true,
-    submodules: false,
   };
   let remoteSections = {};
 
@@ -169,7 +168,6 @@
   $: hasBranchFilter = branchFilterTerm.length > 0;
   $: filteredTags = repository ? repository.tags : [];
   $: filteredStashes = repository ? repository.stashes : [];
-  $: filteredSubmodules = repository ? repository.submodules : [];
   $: selectedStash =
     repository && selectedStashIndex !== null
       ? repository.stashes.find((stash) => stash.index === selectedStashIndex) ?? null
@@ -413,28 +411,6 @@
         {/if}
       </div>
 
-      <div class="tree-section">
-        <button class="tree-section-toggle" type="button" on:click={() => toggleSidebarSection("submodules")}>
-          <span class:expanded={sidebarSections.submodules} class="tree-chevron"></span>
-          <span>{$_("sidebar.submodules")}</span>
-        </button>
-
-        {#if sidebarSections.submodules}
-          {#if filteredSubmodules.length > 0}
-            <ul class="tree-list tree-section-children">
-              {#each filteredSubmodules as submodule}
-                <li class="tree-item tree-item-stack">
-                  <span class="tree-item-icon tree-item-submodule"></span>
-                  <span class="tree-item-label">{submodule.name}</span>
-                  <span class="tree-item-detail">{submodule.path}</span>
-                </li>
-              {/each}
-            </ul>
-          {:else}
-            <p class="tree-empty">{$_("sidebar.submodulesEmpty")}</p>
-          {/if}
-        {/if}
-      </div>
       {/if}
     {/if}
   </section>
@@ -760,12 +736,6 @@
   .tree-item-stash {
     background: linear-gradient(135deg, #9b8eff, #7f71eb);
     box-shadow: 0 0 0 1px rgba(144, 130, 241, 0.14);
-  }
-
-  .tree-item-submodule {
-    border-radius: 3px;
-    background: linear-gradient(135deg, #6fd9d3, #4ca9ba);
-    box-shadow: 0 0 0 1px rgba(88, 178, 187, 0.14);
   }
 
   .tree-item-detail {
