@@ -1,6 +1,6 @@
 [package]
 name = "tauri_git"
-version = "0.1.6"
+version = "0.2.0"
 description = "Minimal Git GUI built with Tauri"
 authors = ["Codex"]
 edition = "2021"
