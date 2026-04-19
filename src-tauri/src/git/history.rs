@@ -23,7 +23,7 @@ pub(crate) fn load_commit_history_chunk(
 
     push_history_refs(repository, &mut revwalk)?;
     revwalk
-        .set_sorting(git2::Sort::TOPOLOGICAL)
+        .set_sorting(git2::Sort::TOPOLOGICAL | git2::Sort::TIME)
         .map_err(|error| {
             bilingual_with_detail(
                 "コミット履歴の並び替えに失敗しました",
@@ -276,5 +276,4 @@ fn load_commit_file_diffs(
 
     Ok(files)
 }
-
 
