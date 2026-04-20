@@ -276,23 +276,16 @@
         graphNodeX: nodeX,
         graphNodeColor: nodeColor,
         graphIsHead: rowIndex === 0,
+        graphWidth: laneCount * graphLaneSpacing + graphPadding * 2,
       });
     });
 
-    const graphWidth = maxLaneCount * graphLaneSpacing + graphPadding * 2;
-    return rows.map((row) => ({
-      ...row,
-      graphWidth,
-    }));
+    return rows;
   }
 
   $: normalizedSearchQuery = searchQuery.trim().toLowerCase();
   $: filteredHistoryCommits = historyCommits.filter((commit) => matchesHistorySearch(commit, normalizedSearchQuery));
   $: historyGraphRows = buildGraphRows(filteredHistoryCommits);
-  $: historyGraphWidth = Math.max(
-    historyGraphRows.length > 0 ? historyGraphRows[0].graphWidth : 0,
-    56,
-  );
   const detailPanelMinHeight = 340;
   let windowHeight = 900;
   let historyRowsElement;
@@ -363,10 +356,9 @@
     <div class="banner error-banner">{error}</div>
   {/if}
 
-  <section class="history-table" style={`--graph-column-width: ${historyGraphWidth}px;`}>
+  <section class="history-table">
     <div class="history-head">
-      <span>{$_("history.columns.graph")}</span>
-      <span>{$_("history.columns.subject")}</span>
+      <span aria-hidden="true"></span>
       <span>{$_("history.columns.author")}</span>
       <span>{$_("history.columns.hash")}</span>
       <span>{$_("history.columns.date")}</span>
@@ -403,24 +395,23 @@
                     fill={commit.graphNodeColor}
                   />
                 </svg>
-              </div>
-
-              <div class="subject-cell">
-                {#if commit.labels.length > 0}
-                  <div class="history-tags">
-                    {#each commit.labels as label}
-                      <span
-                        class:history-tag-local={label.scope === "local"}
-                        class:history-tag-remote={label.scope === "remote"}
-                        class:history-tag-ref={label.scope === "tag"}
-                        class:history-tag-current={label.is_current}
-                      >
-                        {label.name}
-                      </span>
-                    {/each}
-                  </div>
-                {/if}
-                <strong>{commit.summary}</strong>
+                <div class="commit-summary-cell">
+                  {#if commit.labels.length > 0}
+                    <div class="history-tags">
+                      {#each commit.labels as label}
+                        <span
+                          class:history-tag-local={label.scope === "local"}
+                          class:history-tag-remote={label.scope === "remote"}
+                          class:history-tag-ref={label.scope === "tag"}
+                          class:history-tag-current={label.is_current}
+                        >
+                          {label.name}
+                        </span>
+                      {/each}
+                    </div>
+                  {/if}
+                  <strong>{commit.summary}</strong>
+                </div>
               </div>
 
               <div class="author-cell">
@@ -707,7 +698,7 @@
   .history-head,
   .history-row-button {
     display: grid;
-    grid-template-columns: var(--graph-column-width, 108px) minmax(0, 1.5fr) minmax(140px, 0.8fr) 92px 132px;
+    grid-template-columns: minmax(0, 1.5fr) minmax(140px, 0.8fr) 92px 132px;
     gap: 14px;
     align-items: center;
   }
@@ -766,7 +757,9 @@
     display: flex;
     align-items: center;
     justify-content: flex-start;
+    gap: 8px;
     overflow: visible;
+    min-width: 0;
   }
 
   .graph-svg {
@@ -775,16 +768,18 @@
     flex: 0 0 auto;
   }
 
-  .subject-cell {
+  .commit-summary-cell {
     min-width: 0;
     display: flex;
+    flex-direction: row;
     align-items: center;
-    gap: 6px;
+    gap: 8px;
+    margin-left: 2px;
     overflow: hidden;
     height: 100%;
   }
 
-  .subject-cell strong {
+  .commit-summary-cell strong {
     display: block;
     color: var(--text-primary);
     line-height: 1.2;
@@ -796,8 +791,13 @@
     flex: 1;
   }
 
+  .commit-summary-cell .history-tags {
+    flex-shrink: 0;
+    min-width: 0;
+  }
+
   .muted,
-  .muted-history-row .subject-cell strong,
+  .muted-history-row .commit-summary-cell strong,
   .muted-history-row .author-cell,
   .muted-history-row .hash-cell,
   .muted-history-row .date-cell {
