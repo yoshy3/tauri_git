@@ -284,6 +284,7 @@
   }
 
   $: normalizedSearchQuery = searchQuery.trim().toLowerCase();
+  $: historySearchActive = normalizedSearchQuery.length > 0;
   $: filteredHistoryCommits = historyCommits.filter((commit) => matchesHistorySearch(commit, normalizedSearchQuery));
   $: historyGraphRows = buildGraphRows(filteredHistoryCommits);
   const detailPanelMinHeight = 340;
@@ -356,7 +357,7 @@
     <div class="banner error-banner">{error}</div>
   {/if}
 
-  <section class="history-table">
+  <section class:history-filter-active={historySearchActive} class="history-table">
     <div class="history-head">
       <span aria-hidden="true"></span>
       <span>{$_("history.columns.author")}</span>
@@ -370,31 +371,33 @@
           <li class:history-row-selected={selectedCommitOid === commit.oid} class:muted-history-row={!commit.on_current_branch}>
             <button class="history-row-button" data-commit-oid={commit.oid} type="button" on:click={() => onSelectCommit(commit.oid)}>
               <div class="graph-cell">
-                <svg
-                  class="graph-svg"
-                  viewBox={`0 0 ${commit.graphWidth} ${graphRowHeight}`}
-                  width={commit.graphWidth}
-                  height={graphRowHeight}
-                  preserveAspectRatio="xMinYMid meet"
-                  aria-hidden="true"
-                >
-                  {#each commit.graphLines as line}
-                    <path
-                      d={line.d}
-                      stroke={line.stroke}
-                      stroke-width="2"
-                      fill="none"
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
+                {#if !historySearchActive}
+                  <svg
+                    class="graph-svg"
+                    viewBox={`0 0 ${commit.graphWidth} ${graphRowHeight}`}
+                    width={commit.graphWidth}
+                    height={graphRowHeight}
+                    preserveAspectRatio="xMinYMid meet"
+                    aria-hidden="true"
+                  >
+                    {#each commit.graphLines as line}
+                      <path
+                        d={line.d}
+                        stroke={line.stroke}
+                        stroke-width="2"
+                        fill="none"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                      />
+                    {/each}
+                    <circle
+                      cx={commit.graphNodeX}
+                      cy={graphCenterY}
+                      r={commit.graphIsHead ? 4.5 : 3.5}
+                      fill={commit.graphNodeColor}
                     />
-                  {/each}
-                  <circle
-                    cx={commit.graphNodeX}
-                    cy={graphCenterY}
-                    r={commit.graphIsHead ? 4.5 : 3.5}
-                    fill={commit.graphNodeColor}
-                  />
-                </svg>
+                  </svg>
+                {/if}
                 <div class="commit-summary-cell">
                   {#if commit.labels.length > 0}
                     <div class="history-tags">
@@ -762,6 +765,14 @@
     min-width: 0;
   }
 
+  .history-filter-active .graph-cell {
+    gap: 0;
+  }
+
+  .history-filter-active .graph-svg {
+    display: none;
+  }
+
   .graph-svg {
     display: block;
     overflow: visible;
@@ -777,6 +788,10 @@
     margin-left: 2px;
     overflow: hidden;
     height: 100%;
+  }
+
+  .history-filter-active .commit-summary-cell {
+    margin-left: 0;
   }
 
   .commit-summary-cell strong {
