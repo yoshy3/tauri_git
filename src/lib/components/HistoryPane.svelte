@@ -500,7 +500,7 @@
                   {$_("history.details.reset")}
                 </button>
                 <button class="commit-details-close" type="button" aria-label={$_("history.details.close")} on:click={onCloseCommitDetail}>
-                  ×
+                  ÁE
                 </button>
               </div>
             </div>
@@ -710,7 +710,6 @@
     padding: 4px 12px;
     color: var(--text-subtle);
     font-size: 0.64rem;
-    text-transform: uppercase;
     letter-spacing: 0.1em;
     border-bottom: 1px solid var(--row-border);
     background: var(--panel-soft-background);
@@ -1017,7 +1016,6 @@
     color: var(--text-muted);
     font-size: 0.72rem;
     letter-spacing: 0.08em;
-    text-transform: uppercase;
   }
 
   .commit-party-main {
@@ -1099,7 +1097,6 @@
     font-size: 0.68rem;
     font-weight: 700;
     letter-spacing: 0.08em;
-    text-transform: uppercase;
   }
 
   .commit-detail-action:hover {
@@ -1116,7 +1113,6 @@
   .commit-detail-meta-row > span:first-child {
     color: var(--text-muted);
     font-size: 0.72rem;
-    text-transform: uppercase;
     letter-spacing: 0.08em;
   }
 
@@ -1181,7 +1177,6 @@
     color: var(--text-muted);
     font-size: 0.72rem;
     letter-spacing: 0.08em;
-    text-transform: uppercase;
   }
 
   .commit-diff-header {
@@ -1208,7 +1203,6 @@
     font-size: 0.68rem;
     font-weight: 700;
     letter-spacing: 0.08em;
-    text-transform: uppercase;
   }
 
   .commit-diff-open:hover:enabled {

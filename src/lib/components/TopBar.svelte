@@ -265,8 +265,8 @@
           class="locale-button"
           type="button"
           on:click={() => setAppLocale("ja")}
-          title="日本語"
-          aria-label="日本語"
+          title="日本誁E
+          aria-label="日本誁E
         >
           <span class="button-icon" aria-hidden="true">
             <span class="locale-glyph locale-glyph-ja">日</span>
@@ -350,7 +350,6 @@
     background: transparent;
     border: 0;
     color: var(--text-muted);
-    text-transform: uppercase;
     letter-spacing: 0.08em;
     font-size: 0.72rem;
     min-width: 66px;

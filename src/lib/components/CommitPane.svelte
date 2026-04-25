@@ -620,7 +620,6 @@
     font-size: 0.76rem;
     font-weight: 700;
     letter-spacing: 0.06em;
-    text-transform: uppercase;
     writing-mode: horizontal-tb;
     box-shadow: var(--panel-shadow);
   }
@@ -709,7 +708,6 @@
   .changes-summary h2 {
     margin: 0;
     font-size: 0.8rem;
-    text-transform: uppercase;
     letter-spacing: 0.1em;
     color: var(--text-primary);
   }
@@ -762,7 +760,6 @@
     font-size: 0.71rem;
     font-weight: 700;
     letter-spacing: 0.06em;
-    text-transform: uppercase;
     white-space: nowrap;
   }
 
@@ -826,7 +823,6 @@
     font-size: 0.74rem;
     font-weight: 700;
     letter-spacing: 0.08em;
-    text-transform: uppercase;
     height: 38px;
     align-self: start;
     box-sizing: border-box;
@@ -847,7 +843,6 @@
   .action-block-copy h2 {
     margin: 0;
     font-size: 0.8rem;
-    text-transform: uppercase;
     letter-spacing: 0.1em;
     color: var(--text-primary);
   }
