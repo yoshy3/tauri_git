@@ -143,8 +143,10 @@
   }
 
   .diff-dialog {
-    width: min(1280px, 100%);
-    height: min(820px, calc(100vh - 48px));
+    width: max(0px, calc(100vw - 48px));
+    height: max(0px, calc(100vh - 48px));
+    max-width: none;
+    max-height: none;
     display: grid;
     grid-template-rows: auto auto 1fr;
     overflow: hidden;
@@ -324,8 +326,11 @@
   }
 
   .diff-inline-changed {
-    padding: 0 1px;
+    padding: 0 2px;
+    margin: 0 -1px;
     border-radius: 3px;
+    box-decoration-break: clone;
+    -webkit-box-decoration-break: clone;
   }
 
   .diff-side-added {
@@ -381,22 +386,26 @@
   }
 
   .diff-side-removed .diff-inline-changed {
-    background: var(--danger-soft-inline);
+    background: var(--diff-inline-removed-bg);
+    box-shadow: inset 0 0 0 1px var(--diff-inline-removed-border);
     color: var(--text-primary);
   }
 
   .diff-side-added .diff-inline-changed {
-    background: color-mix(in srgb, var(--success-soft-row) 82%, white 18%);
+    background: var(--diff-inline-added-bg);
+    box-shadow: inset 0 0 0 1px var(--diff-inline-added-border);
     color: var(--text-primary);
   }
 
   .diff-side-modified-left .diff-inline-changed {
-    background: color-mix(in srgb, var(--warning-soft-row) 82%, white 18%);
+    background: var(--diff-inline-modified-left-bg);
+    box-shadow: inset 0 0 0 1px var(--diff-inline-modified-left-border);
     color: var(--text-primary);
   }
 
   .diff-side-modified-right .diff-inline-changed {
-    background: color-mix(in srgb, var(--modified-soft-row) 82%, white 18%);
+    background: var(--diff-inline-modified-right-bg);
+    box-shadow: inset 0 0 0 1px var(--diff-inline-modified-right-border);
     color: var(--text-primary);
   }
 
@@ -411,7 +420,8 @@
 
   @media (max-width: 900px) {
     .diff-dialog {
-      height: min(860px, calc(100vh - 24px));
+      width: max(0px, calc(100vw - 24px));
+      height: max(0px, calc(100vh - 24px));
     }
 
     .diff-row,
