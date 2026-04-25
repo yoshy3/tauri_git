@@ -796,7 +796,7 @@
   .commit-summary-cell strong {
     display: block;
     color: var(--text-primary);
-    line-height: 1.2;
+    line-height: 1.4;
     font-size: 0.78rem;
     font-weight: 500;
     white-space: nowrap;
