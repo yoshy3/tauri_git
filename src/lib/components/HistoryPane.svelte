@@ -500,7 +500,7 @@
                   {$_("history.details.reset")}
                 </button>
                 <button class="commit-details-close" type="button" aria-label={$_("history.details.close")} on:click={onCloseCommitDetail}>
-                  ÁE
+                  ×
                 </button>
               </div>
             </div>

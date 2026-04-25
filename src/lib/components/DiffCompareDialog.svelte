@@ -66,7 +66,7 @@
             <span class="diff-dialog-status">{status}</span>
           {/if}
           <button class="diff-dialog-close" type="button" aria-label={$_("diffDialog.close")} on:click={onClose}>
-            ÁE
+            ×
           </button>
         </div>
       </header>
