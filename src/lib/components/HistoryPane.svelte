@@ -1,5 +1,5 @@
 <script>
-  import { tick } from "svelte";
+  import { tick, onMount } from "svelte";
   import { _ } from "svelte-i18n";
   import DiffCompareDialog from "./DiffCompareDialog.svelte";
 
@@ -108,6 +108,84 @@
     }
   }
 
+  const historyColumnWidthsKey = "tauri-git:history-column-widths";
+  const minAuthorWidth = 80;
+  const maxAuthorWidth = 500;
+  const minHashWidth = 50;
+  const maxHashWidth = 200;
+  const minDateWidth = 60;
+  const maxDateWidth = 300;
+
+  let authorColumnWidth = 180;
+  let hashColumnWidth = 92;
+  let dateColumnWidth = 132;
+  let columnDragging = null;
+  let columnDragStartX = 0;
+  let columnDragStartWidth = 0;
+
+  function saveColumnWidths() {
+    localStorage.setItem(historyColumnWidthsKey, JSON.stringify({ authorColumnWidth, hashColumnWidth, dateColumnWidth }));
+  }
+
+  function loadColumnWidths() {
+    const saved = localStorage.getItem(historyColumnWidthsKey);
+    if (!saved) return;
+    try {
+      const parsed = JSON.parse(saved);
+      if (typeof parsed.authorColumnWidth === "number") {
+        authorColumnWidth = Math.min(Math.max(parsed.authorColumnWidth, minAuthorWidth), maxAuthorWidth);
+      }
+      if (typeof parsed.hashColumnWidth === "number") {
+        hashColumnWidth = Math.min(Math.max(parsed.hashColumnWidth, minHashWidth), maxHashWidth);
+      }
+      if (typeof parsed.dateColumnWidth === "number") {
+        dateColumnWidth = Math.min(Math.max(parsed.dateColumnWidth, minDateWidth), maxDateWidth);
+      }
+    } catch (_error) {
+      localStorage.removeItem(historyColumnWidthsKey);
+    }
+  }
+
+  let headerElement;
+  let hoverBoundary = null;
+  const boundaryTolerance = 8;
+
+  function getHeaderColumnLeftEdges() {
+    if (!headerElement) return [];
+    return Array.from(headerElement.querySelectorAll(".history-col-header")).map(
+      (el) => el.getBoundingClientRect().left,
+    );
+  }
+
+  function handleHeaderPointerMove(event) {
+    const edges = getHeaderColumnLeftEdges();
+    const columns = ["author", "hash", "date"];
+    hoverBoundary = null;
+    for (let i = 0; i < edges.length; i++) {
+      const boundaryCenter = edges[i] - 14; // left edge of 14px gap
+      if (Math.abs(event.clientX - boundaryCenter) <= boundaryTolerance) {
+        hoverBoundary = columns[i];
+        return;
+      }
+    }
+  }
+
+  function handleHeaderPointerLeave() {
+    if (!columnDragging) {
+      hoverBoundary = null;
+    }
+  }
+
+  function handleHeaderPointerDown(event) {
+    if (!hoverBoundary) return;
+    event.preventDefault();
+    columnDragging = hoverBoundary;
+    columnDragStartX = event.clientX;
+    columnDragStartWidth =
+      hoverBoundary === "author" ? authorColumnWidth : hoverBoundary === "hash" ? hashColumnWidth : dateColumnWidth;
+    document.body.classList.add("column-resizing");
+  }
+
   function handleSplitterPointerDown(event) {
     if (!detailPanelVisible) {
       return;
@@ -120,15 +198,29 @@
   }
 
   function handleWindowPointerMove(event) {
-    if (!detailPanelDragging) {
-      return;
+    if (detailPanelDragging) {
+      detailPanelHeight = clampDetailPanelHeight(detailDragStartHeight - (event.clientY - detailDragStartY));
     }
-
-    detailPanelHeight = clampDetailPanelHeight(detailDragStartHeight - (event.clientY - detailDragStartY));
+    if (columnDragging) {
+      const newWidth = columnDragStartWidth - (event.clientX - columnDragStartX);
+      if (columnDragging === "author") {
+        authorColumnWidth = Math.min(Math.max(newWidth, minAuthorWidth), maxAuthorWidth);
+      } else if (columnDragging === "hash") {
+        hashColumnWidth = Math.min(Math.max(newWidth, minHashWidth), maxHashWidth);
+      } else if (columnDragging === "date") {
+        dateColumnWidth = Math.min(Math.max(newWidth, minDateWidth), maxDateWidth);
+      }
+    }
   }
 
   function handleWindowPointerUp() {
     detailPanelDragging = false;
+    if (columnDragging) {
+      columnDragging = null;
+      hoverBoundary = null;
+      document.body.classList.remove("column-resizing");
+      saveColumnWidths();
+    }
   }
 
   function dedupeLaneEntries(entries) {
@@ -334,6 +426,11 @@
       void tick().then(ensureSelectedCommitVisible);
     }
   }
+  $: historyGridTemplate = `minmax(0, 1fr) ${authorColumnWidth}px ${hashColumnWidth}px ${dateColumnWidth}px`;
+
+  onMount(() => {
+    loadColumnWidths();
+  });
 </script>
 
 <svelte:window bind:innerHeight={windowHeight} on:pointermove={handleWindowPointerMove} on:pointerup={handleWindowPointerUp} />
@@ -358,12 +455,19 @@
     <div class="banner error-banner">{error}</div>
   {/if}
 
-  <section class:history-filter-active={historySearchActive} class="history-table">
-    <div class="history-head">
+  <section class:history-filter-active={historySearchActive} class="history-table" style="--history-grid-columns: {historyGridTemplate}">
+    <div
+      class="history-head"
+      bind:this={headerElement}
+      style:cursor={hoverBoundary ? "col-resize" : undefined}
+      on:pointermove={handleHeaderPointerMove}
+      on:pointerleave={handleHeaderPointerLeave}
+      on:pointerdown={handleHeaderPointerDown}
+    >
       <span aria-hidden="true"></span>
-      <span>{$_("history.columns.author")}</span>
-      <span>{$_("history.columns.hash")}</span>
-      <span>{$_("history.columns.date")}</span>
+      <span class="history-col-header">{$_("history.columns.author")}</span>
+      <span class="history-col-header">{$_("history.columns.hash")}</span>
+      <span class="history-col-header">{$_("history.columns.date")}</span>
     </div>
 
     {#if repository && filteredHistoryCommits.length > 0}
@@ -705,9 +809,18 @@
   .history-head,
   .history-row-button {
     display: grid;
-    grid-template-columns: minmax(0, 1.5fr) minmax(140px, 0.8fr) 92px 132px;
+    grid-template-columns: var(--history-grid-columns, minmax(0, 1.5fr) minmax(140px, 0.8fr) 92px 132px);
     gap: 14px;
     align-items: center;
+  }
+
+  .history-col-header {
+    user-select: none;
+  }
+
+  :global(body.column-resizing) {
+    cursor: col-resize !important;
+    user-select: none !important;
   }
 
   .history-head {
