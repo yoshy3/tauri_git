@@ -16,6 +16,6 @@ tauri-build = { version = "2.0.2", features = [] }
 chrono = { version = "0.4.44", default-features = false, features = ["std"] }
 git2 = "0.20.2"
 serde = { version = "1", features = ["derive"] }
-tauri = { version = "2.10.1", features = [] }
-tauri-plugin-dialog = "2.6.0"
+tauri = { version = "2.11.0", features = [] }
+tauri-plugin-dialog = "2.7.0"
 tauri-plugin-window-state = "2.2.1"
