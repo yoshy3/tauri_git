@@ -11,10 +11,12 @@
   export let implementedActions = [];
   export let activeAction = "";
   export let canResetSelectedCommit = false;
+  export let canRevertSelectedCommit = false;
   export let onAction = () => {};
   export let onSelectRepository = () => {};
   export let onOpenRecentRepository = () => {};
   export let onResetSelectedCommit = () => {};
+  export let onRevertSelectedCommit = () => {};
   export let onRefresh = () => {};
   export let onToggleTheme = () => {};
   let recentMenuOpen = false;
@@ -200,6 +202,17 @@
           </span>
         </span>
         <span class="button-label">{$_("topbar.reset")}</span>
+      </button>
+      <button class="toolbar-button" disabled={!repository || loading || !canRevertSelectedCommit} on:click={onRevertSelectedCommit}>
+        <span class="button-icon-wrap">
+          <span class="button-icon" aria-hidden="true">
+            <svg class="toolbar-svg toolbar-svg-revert" viewBox="0 0 16 16" fill="none">
+              <path d="M5.25 4.75h4.25a3.75 3.75 0 0 1 0 7.5H5.75" />
+              <path d="M5.25 2.75 2.75 5.25l2.5 2.5" />
+            </svg>
+          </span>
+        </span>
+        <span class="button-label">{$_("topbar.revert")}</span>
       </button>
       <button class:active={activeAction === "Refresh"} class="toolbar-button" on:click={onRefresh} disabled={!repository || loading}>
         <span class="button-icon-wrap">

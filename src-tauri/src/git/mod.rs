@@ -50,6 +50,7 @@ use repository::{repository_root, tree_is_unchanged};
 pub(crate) use status::build_repository_status;
 pub(crate) use worktree::{
     apply_stash_entry, create_commit, create_stash, discard_selected_changes, pop_stash_entry,
+    revert_commit,
 };
 use worktree::load_stashes;
 

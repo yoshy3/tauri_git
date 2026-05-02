@@ -176,6 +176,20 @@ pub(crate) async fn reset_current_branch(
 }
 
 #[tauri::command]
+pub(crate) async fn revert_commit(
+    path: String,
+    target: String,
+    message: String,
+) -> Result<GitStatusResponse, String> {
+    run_blocking(move || {
+        let mut repository = git::open_repo(&path)?;
+        git::revert_commit(&repository, &target, &message)?;
+        git::build_repository_status(&mut repository)
+    })
+    .await
+}
+
+#[tauri::command]
 pub(crate) async fn delete_branch(
     path: String,
     branch_name: String,

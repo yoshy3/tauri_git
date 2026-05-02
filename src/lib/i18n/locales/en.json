@@ -8,6 +8,7 @@
   "errors": {
     "openRepositoryFirst": "Open a repository first.",
     "commitMessageEmpty": "Commit message is empty.",
+    "revertMessageEmpty": "Revert commit message is empty.",
     "stashFilesEmpty": "Select at least one file to stash.",
     "discardFilesEmpty": "Select at least one file to discard.",
     "branchNameEmpty": "Branch name is empty.",
@@ -32,6 +33,7 @@
     "stash": "Stash",
     "discard": "Discard",
     "reset": "Reset",
+    "revert": "Revert",
     "pop": "Pop",
     "refresh": "Refresh",
     "syncing": "Syncing..."
@@ -116,6 +118,17 @@
       "mixed": "The branch pointer and index will be reset, but your working tree changes will remain.",
       "hard": "This permanently discards uncommitted index and working tree changes."
     }
+  },
+  "revertDialog": {
+    "title": "Revert Commit",
+    "description": "Revert {target} onto {branch} and create a new commit.",
+    "targetLabel": "Revert target",
+    "messageLabel": "Commit message",
+    "messagePlaceholder": "Message for the revert commit",
+    "warning": "The working tree must be clean before reverting. If conflicts occur, resolve them from the command line before refreshing.",
+    "confirm": "Create Revert Commit",
+    "reverting": "Reverting...",
+    "cancel": "Cancel"
   },
   "branchDelete": {
     "title": "Delete Branch",
@@ -217,6 +230,7 @@
       "committer": "Committer",
       "close": "Close details",
       "reset": "Reset",
+      "revert": "Revert",
       "refs": "Refs",
       "sha": "SHA",
       "parents": "Parents",

@@ -139,6 +139,90 @@ pub(crate) fn create_commit(repository: &Repository, message: &str, amend: bool)
     Ok(())
 }
 
+pub(crate) fn revert_commit(repository: &Repository, target: &str, message: &str) -> Result<(), String> {
+    let target = target.trim();
+    if target.is_empty() {
+        return Err(bilingual("revert 対象が空です。", "The revert target is empty."));
+    }
+
+    let message = message.trim();
+    if message.is_empty() {
+        return Err(bilingual(
+            "コミットメッセージが空です。",
+            "Commit message is empty.",
+        ));
+    }
+
+    current_local_branch_name(repository).ok_or_else(|| {
+        bilingual(
+            "現在のローカルブランチを特定できません。",
+            "The current local branch could not be determined.",
+        )
+    })?;
+
+    let target_oid = Oid::from_str(target).map_err(|error| {
+        bilingual_with_detail(
+            "revert 対象のコミット ID が不正です",
+            "The revert target commit ID is invalid",
+            error.message(),
+        )
+    })?;
+    let target_commit = repository.find_commit(target_oid).map_err(|error| {
+        bilingual_with_detail(
+            "revert 対象のコミットを読み込めませんでした",
+            "Failed to load the revert target commit",
+            error.message(),
+        )
+    })?;
+    if target_commit.parent_count() > 1 {
+        return Err(bilingual(
+            "マージコミットの revert はまだ対応していません。",
+            "Reverting merge commits is not supported yet.",
+        ));
+    }
+
+    let mut status_options = StatusOptions::new();
+    status_options
+        .include_untracked(true)
+        .recurse_untracked_dirs(true)
+        .include_ignored(false)
+        .renames_head_to_index(true)
+        .renames_index_to_workdir(true);
+    let statuses = repository
+        .statuses(Some(&mut status_options))
+        .map_err(|error| {
+            bilingual_with_detail(
+                "revert 前のステータスを確認できませんでした",
+                "Failed to inspect repository status before revert",
+                error.message(),
+            )
+        })?;
+    if !statuses.is_empty() {
+        return Err(bilingual(
+            "revert の前に作業ツリーを clean にしてください。",
+            "Clean the working tree before reverting.",
+        ));
+    }
+    drop(statuses);
+
+    let repo_root = repository_root(repository)?;
+    let mut revert_command = git_command();
+    revert_command
+        .current_dir(&repo_root)
+        .arg("revert")
+        .arg("--no-commit")
+        .arg(target);
+    run_git_command(revert_command, "git revert")?;
+
+    let mut commit_command = git_command();
+    commit_command
+        .current_dir(repo_root)
+        .arg("commit")
+        .arg("-m")
+        .arg(message);
+    run_git_command(commit_command, "git commit")
+}
+
 
 pub(crate) fn create_stash(
     repository: &mut Repository,
@@ -496,5 +580,4 @@ fn parse_stash_display(message: &str, index: usize) -> (String, String) {
         (trimmed.to_string(), String::new())
     }
 }
-
 

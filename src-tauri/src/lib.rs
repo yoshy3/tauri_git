@@ -26,6 +26,7 @@ pub fn run() {
             commands::create_branch,
             commands::rebase_current_branch,
             commands::reset_current_branch,
+            commands::revert_commit,
             commands::delete_branch,
             commands::create_tag,
             commands::delete_tag,
