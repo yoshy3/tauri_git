@@ -20,6 +20,7 @@ Tauri Git is a desktop Git client focused on a compact workflow:
 - Browse branches and remotes in a tree view
 - Browse tags and jump from a tag to its commit in history
 - Checkout, create, rebase, reset, and delete branches
+- Revert a commit with an editable revert commit message
 
 ## Screenshot
 
@@ -51,6 +52,7 @@ Tauri Git is a desktop Git client focused on a compact workflow:
 - `Reset` action from commit details and the top bar, with `soft` / `mixed` / `hard` selection
 - Commit creation from the changes panel
 - Commit amend from the changes panel, with previous summary / description prefilled
+- Revert a commit from commit details with an editable commit message dialog
 - Collapsed changes panel button with changed-file count badge
 - Warning when amending a commit that has already been pushed
 - Stash create / apply / pop
