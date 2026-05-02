@@ -117,6 +117,15 @@
       "hard": "This permanently discards uncommitted index and working tree changes."
     }
   },
+  "revertDialog": {
+    "title": "Revert Commit",
+    "description": "Create a new commit that undoes the changes from {id}.",
+    "targetLabel": "Revert target",
+    "messageLabel": "Commit message",
+    "confirm": "Revert Commit",
+    "reverting": "Reverting...",
+    "cancel": "Cancel"
+  },
   "branchDelete": {
     "title": "Delete Branch",
     "description": "This action will delete {branch}. Type the full branch name below to confirm.",
@@ -217,6 +226,7 @@
       "committer": "Committer",
       "close": "Close details",
       "reset": "Reset",
+      "revert": "Revert",
       "refs": "Refs",
       "sha": "SHA",
       "parents": "Parents",

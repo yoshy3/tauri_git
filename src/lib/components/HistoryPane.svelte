@@ -14,6 +14,7 @@
   export let selectedCommitDetailLoading = false;
   export let onSelectCommit = () => {};
   export let onOpenResetCommitDialog = () => {};
+  export let onOpenRevertCommitDialog = () => {};
   export let onCloseCommitDetail = () => {};
   let searchQuery = "";
 
@@ -496,6 +497,9 @@
             </div>
 
               <div class="commit-details-actions">
+                <button class="commit-detail-action" type="button" on:click={() => onOpenRevertCommitDialog(selectedCommitDetail)}>
+                  {$_("history.details.revert")}
+                </button>
                 <button class="commit-detail-action" type="button" on:click={() => onOpenResetCommitDialog(selectedCommitDetail)}>
                   {$_("history.details.reset")}
                 </button>

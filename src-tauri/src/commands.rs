@@ -317,6 +317,20 @@ pub(crate) async fn get_commit_detail(
 }
 
 #[tauri::command]
+pub(crate) async fn revert_commit(
+    path: String,
+    target: String,
+    message: String,
+) -> Result<GitStatusResponse, String> {
+    run_blocking(move || {
+        let mut repository = git::open_repo(&path)?;
+        git::revert_commit(&repository, &target, &message)?;
+        git::build_repository_status(&mut repository)
+    })
+    .await
+}
+
+#[tauri::command]
 pub(crate) async fn resolve_tag_target(
     path: String,
     tag_name: String,
