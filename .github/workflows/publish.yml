@@ -5,6 +5,17 @@ on:
     tags:
       - "*"
       - "**"
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: "Tag name to use for the release"
+        required: true
+        default: "v0.2.2-dry-run"
+      release_draft:
+        description: "Create the GitHub release as a draft"
+        required: true
+        default: true
+        type: boolean
 
 permissions:
   contents: write
@@ -63,9 +74,10 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tagName: ${{ github.ref_name }}
-          releaseName: ${{ github.ref_name }}
+          tagName: ${{ github.event_name == 'workflow_dispatch' && inputs.tag_name || github.ref_name }}
+          releaseName: ${{ github.event_name == 'workflow_dispatch' && inputs.tag_name || github.ref_name }}
           releaseBody: "See the assets to download this version and install."
           generateReleaseNotes: true
-          prerelease: ${{ contains(github.ref_name, '-') }}
+          prerelease: ${{ contains(github.event_name == 'workflow_dispatch' && inputs.tag_name || github.ref_name, '-') }}
+          releaseDraft: ${{ github.event_name == 'workflow_dispatch' && inputs.release_draft || false }}
           args: ${{ matrix.args }}
