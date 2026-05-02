@@ -316,6 +316,44 @@ pub(crate) fn reset_current_branch_to_commit(
 }
 
 
+pub(crate) fn revert_commit(
+    repository: &Repository,
+    target: &str,
+    message: &str,
+) -> Result<(), String> {
+    let target = target.trim();
+    if target.is_empty() {
+        return Err(bilingual("revert 対象が空です。", "The revert target is empty."));
+    }
+
+    let message = message.trim();
+    if message.is_empty() {
+        return Err(bilingual(
+            "コミットメッセージが空です。",
+            "Commit message is empty.",
+        ));
+    }
+
+    let repo_root = repository_root(repository)?;
+
+    let mut revert_cmd = git_command();
+    revert_cmd
+        .current_dir(&repo_root)
+        .arg("revert")
+        .arg("--no-commit")
+        .arg(target);
+    run_git_command(revert_cmd, "git revert")?;
+
+    let mut commit_cmd = git_command();
+    commit_cmd
+        .current_dir(&repo_root)
+        .arg("commit")
+        .arg("-m")
+        .arg(message);
+    run_git_command(commit_cmd, "git commit")
+}
+
+
 pub(crate) fn delete_repository_branch(
     repository: &Repository,
     branch_name: &str,

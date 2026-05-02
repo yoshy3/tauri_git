@@ -117,6 +117,15 @@
       "hard": "未コミットの index / working tree の変更を完全に破棄します。"
     }
   },
+  "revertDialog": {
+    "title": "コミットを取り消す",
+    "description": "{id} の変更を取り消す新しいコミットを作成します。",
+    "targetLabel": "取り消し対象",
+    "messageLabel": "コミットメッセージ",
+    "confirm": "コミットを取り消す",
+    "reverting": "取り消し中...",
+    "cancel": "キャンセル"
+  },
   "branchDelete": {
     "title": "ブランチを削除",
     "description": "{branch} を削除します。確認のため、下に完全なブランチ名を入力してください。",
@@ -217,6 +226,7 @@
       "committer": "コミッター",
       "close": "詳細を閉じる",
       "reset": "Reset",
+      "revert": "Revert",
       "refs": "参照",
       "sha": "SHA",
       "parents": "親コミット",

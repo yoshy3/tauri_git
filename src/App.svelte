@@ -41,6 +41,9 @@
   let resetDialogOpen = false;
   let resetTargetCommit = null;
   let resetModeDraft = "mixed";
+  let revertDialogOpen = false;
+  let revertTargetCommit = null;
+  let revertMessageDraft = "";
   let tagDialogOpen = false;
   let tagNameDraft = "";
   let tagMessageDraft = "";
@@ -130,6 +133,7 @@
       branchDialogOpen ||
       rebaseDialogOpen ||
       resetDialogOpen ||
+      revertDialogOpen ||
       tagDialogOpen ||
       deleteDialogOpen ||
       deleteTagDialogOpen ||
@@ -160,6 +164,12 @@
     resetDialogOpen = false;
     resetTargetCommit = null;
     resetModeDraft = "mixed";
+  }
+
+  function resetRevertDialog() {
+    revertDialogOpen = false;
+    revertTargetCommit = null;
+    revertMessageDraft = "";
   }
 
   function resetDeleteDialog() {
@@ -1256,6 +1266,64 @@
     }
   }
 
+  function openRevertCommitDialog(commit = selectedCommitDetail) {
+    if (!repository) {
+      error = t("errors.openRepositoryFirst");
+      return;
+    }
+
+    const targetCommit =
+      commit?.oid
+        ? commit
+        : selectedCommitOid
+          ? selectedCommitDetail?.oid === selectedCommitOid
+            ? selectedCommitDetail
+            : historyCommits.find((entry) => entry.oid === selectedCommitOid) ?? null
+          : null;
+
+    if (!targetCommit?.oid) {
+      return;
+    }
+
+    closeBranchMenu();
+    revertTargetCommit = {
+      oid: targetCommit.oid,
+      id: targetCommit.id ?? targetCommit.oid.slice(0, 7),
+      summary: targetCommit.summary ?? "",
+    };
+    revertMessageDraft = `Revert "${revertTargetCommit.summary}"`;
+    revertDialogOpen = true;
+    error = "";
+  }
+
+  async function confirmRevertCommit() {
+    if (!repository || !revertTargetCommit?.oid) {
+      return;
+    }
+
+    loading = true;
+    error = "";
+
+    try {
+      repository = await invoke("revert_commit", {
+        path: repository.repo_path,
+        target: revertTargetCommit.oid,
+        message: revertMessageDraft,
+      });
+      selectedCommitDetail = null;
+      selectedStashIndex = null;
+      pendingRefCommitOid = "";
+      resetRevertDialog();
+      rightPaneExpanded = false;
+      rightPaneTab = "commit";
+      void loadCommitHistory(repository.repo_path);
+    } catch (message) {
+      error = String(message);
+    } finally {
+      loading = false;
+    }
+  }
+
   async function createBranchFromSelectedRef() {
     if (!repository) {
       error = t("errors.openRepositoryFirst");
@@ -1698,6 +1766,7 @@
       {selectedCommitDetailLoading}
       onSelectCommit={selectCommit}
       onOpenResetCommitDialog={openResetCommitDialog}
+      onOpenRevertCommitDialog={openRevertCommitDialog}
       onCloseCommitDetail={closeCommitDetail}
     />
 
@@ -1820,6 +1889,36 @@
           </button>
           <button class:dialog-button-danger={resetModeDraft === "hard"} class="dialog-button" type="button" on:click={confirmResetCommit} disabled={loading}>
             {loading ? t("resetDialog.resetting") : t("resetDialog.confirm")}
+          </button>
+        </div>
+      </section>
+    </div>
+  {/if}
+
+  {#if revertDialogOpen && revertTargetCommit}
+    <div class="dialog-backdrop" role="presentation" on:click={(event) => event.target === event.currentTarget && !loading && resetRevertDialog()}>
+      <section class="dialog-card" role="dialog" aria-modal="true" aria-labelledby="revert-dialog-title">
+        <div class="dialog-copy">
+          <h2 id="revert-dialog-title">{t("revertDialog.title")}</h2>
+          <p>{t("revertDialog.description", { id: revertTargetCommit.id })}</p>
+        </div>
+
+        <div class="dialog-warning">
+          <span class="dialog-warning-label">{t("revertDialog.targetLabel")}</span>
+          <code>{revertTargetCommit.id} {revertTargetCommit.summary ? `- ${revertTargetCommit.summary}` : ""}</code>
+        </div>
+
+        <label class="dialog-field">
+          <span>{t("revertDialog.messageLabel")}</span>
+          <textarea bind:value={revertMessageDraft} rows="3" disabled={loading}></textarea>
+        </label>
+
+        <div class="dialog-actions">
+          <button class="dialog-button dialog-button-muted" type="button" on:click={resetRevertDialog} disabled={loading}>
+            {t("revertDialog.cancel")}
+          </button>
+          <button class="dialog-button" type="button" on:click={confirmRevertCommit} disabled={loading || !revertMessageDraft.trim()}>
+            {loading ? t("revertDialog.reverting") : t("revertDialog.confirm")}
           </button>
         </div>
       </section>
