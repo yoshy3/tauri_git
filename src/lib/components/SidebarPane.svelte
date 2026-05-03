@@ -20,6 +20,11 @@
   export let onCancelSelectedStash = () => {};
   export let onApplySelectedStash = () => {};
   export let onPopSelectedStash = () => {};
+  export let worktrees = [];
+  export let onOpenAddWorktreeDialog = () => {};
+  export let onOpenWorktree = () => {};
+  export let onOpenRemoveWorktreeDialog = () => {};
+  export let currentRepoPath = "";
 
   let branchFilter = "";
   let branchFilterTerm = "";
@@ -28,6 +33,7 @@
     remotes: true,
     tags: false,
     stashes: true,
+    worktrees: true,
   };
   let remoteSections = {};
 
@@ -140,6 +146,18 @@
       .filter(Boolean);
   }
 
+  function worktreeDisplayName(path) {
+    const normalized = String(path || "").replace(/\\/g, "/").replace(/\/$/, "");
+    const slash = normalized.lastIndexOf("/");
+    return slash >= 0 ? normalized.slice(slash + 1) : normalized;
+  }
+
+  function isActiveWorktree(wtPath) {
+    if (!currentRepoPath) return false;
+    const norm = (p) => String(p || "").replace(/\\/g, "/").replace(/\/$/, "").toLowerCase();
+    return norm(wtPath) === norm(currentRepoPath);
+  }
+
   $: branchFilterTerm = branchFilter.trim().toLowerCase();
   $: localBranchSyncMap = repository
     ? Object.fromEntries((repository.local_branch_syncs ?? []).map((entry) => [entry.name, entry]))
@@ -206,6 +224,62 @@
     {#if !repository}
       <p class="tree-empty">{$_("sidebar.emptyState")}</p>
     {:else}
+      <div class="tree-section">
+        <div class="tree-section-header">
+          <button class="tree-section-toggle tree-section-toggle-grow" type="button" on:click={() => toggleSidebarSection("worktrees")}>
+            <span class:expanded={sidebarSections.worktrees} class="tree-chevron"></span>
+            <span>{$_("sidebar.worktrees")}</span>
+          </button>
+          <button class="tree-section-action" type="button" aria-label={$_("sidebar.newWorktree")} disabled={loading} on:click={onOpenAddWorktreeDialog}>
+            +
+          </button>
+        </div>
+
+        {#if sidebarSections.worktrees}
+          {#if worktrees.length > 0}
+            <ul class="tree-list tree-section-children">
+              {#each worktrees as wt}
+                <li>
+                  <div class:worktree-active={isActiveWorktree(wt.path)} class="tree-item-row">
+                    <button
+                      class="tree-item tree-item-button tree-item-wt"
+                      type="button"
+                      disabled={loading}
+                      title={wt.path}
+                      on:dblclick={() => onOpenWorktree(wt.path)}
+                    >
+                      <span class="tree-item-icon tree-item-worktree"></span>
+                      <span class="tree-item-label">{worktreeDisplayName(wt.path)}</span>
+                      {#if wt.is_main}
+                        <span class="worktree-badge worktree-badge-main">{$_("sidebar.worktreeMain")}</span>
+                      {:else if wt.branch}
+                        <span class="worktree-branch">{wt.branch}</span>
+                      {/if}
+                    </button>
+
+                    {#if !wt.is_main}
+                      <div class="tree-item-actions">
+                        <button
+                          class="tree-item-action-button"
+                          type="button"
+                          aria-label={$_("sidebar.removeWorktree")}
+                          disabled={loading}
+                          on:click={() => onOpenRemoveWorktreeDialog(wt)}
+                        >
+                          ×
+                        </button>
+                      </div>
+                    {/if}
+                  </div>
+                </li>
+              {/each}
+            </ul>
+          {:else}
+            <p class="tree-empty">{$_("sidebar.worktreesEmpty")}</p>
+          {/if}
+        {/if}
+      </div>
+
       <div class="tree-section">
         <button class="tree-section-toggle" type="button" on:click={() => toggleSidebarSection("branches")}>
           <span class:expanded={sidebarSections.branches} class="tree-chevron"></span>
@@ -736,6 +810,76 @@
   .tree-item-stash {
     background: linear-gradient(135deg, #9b8eff, #7f71eb);
     box-shadow: 0 0 0 1px rgba(144, 130, 241, 0.14);
+  }
+
+  .tree-item-worktree {
+    border-radius: 3px;
+    background: linear-gradient(135deg, #56cfb2, #2ea88b);
+    box-shadow: 0 0 0 1px rgba(46, 168, 139, 0.14);
+  }
+
+  /* 3-column layout: icon | name | badge/branch — keeps each item on one line */
+  .tree-item-wt {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+
+  /* Active worktree highlight */
+  .tree-item-row.worktree-active {
+    background: var(--accent-soft);
+    box-shadow: inset 3px 0 0 var(--accent), inset 0 0 0 1px var(--accent-soft-border);
+  }
+
+  .tree-item-row.worktree-active .tree-item-label {
+    color: var(--text-primary);
+    font-weight: 600;
+  }
+
+  .tree-item-row.worktree-active .worktree-branch {
+    color: var(--accent);
+  }
+
+  .worktree-branch {
+    font-size: 0.68rem;
+    color: var(--text-subtle);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+  }
+
+  .worktree-badge {
+    font-size: 0.62rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    padding: 1px 5px;
+    border-radius: 4px;
+    flex-shrink: 0;
+  }
+
+  .worktree-badge-main {
+    background: var(--accent-soft);
+    color: var(--accent-text, var(--text-secondary));
+    border: 1px solid var(--accent-soft-border);
+  }
+
+  .tree-item-action-button {
+    width: 20px;
+    height: 20px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--text-muted);
+    font-size: 0.9rem;
+    line-height: 1;
+    padding: 0;
+  }
+
+  .tree-item-action-button:hover:enabled {
+    background: var(--danger-soft);
+    color: var(--danger-text);
   }
 
   .tree-item-detail {

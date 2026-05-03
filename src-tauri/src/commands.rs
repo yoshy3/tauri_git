@@ -1,7 +1,7 @@
 use crate::git;
 use crate::models::{
     GitCommitDetail, GitCommitHistoryChunk, GitReferenceTarget, GitStatusResponse,
-    GitWorktreeFileDiff,
+    GitWorktreeEntry, GitWorktreeFileDiff,
 };
 
 async fn run_blocking<T, F>(job: F) -> Result<T, String>
@@ -338,6 +338,50 @@ pub(crate) async fn resolve_tag_target(
     run_blocking(move || {
         let repository = git::open_repo(&path)?;
         git::resolve_tag_target_oid(&repository, &tag_name)
+    })
+    .await
+}
+
+#[tauri::command]
+pub(crate) async fn list_worktrees(path: String) -> Result<Vec<GitWorktreeEntry>, String> {
+    run_blocking(move || {
+        let repository = git::open_repo(&path)?;
+        git::list_worktrees(&repository)
+    })
+    .await
+}
+
+#[tauri::command]
+pub(crate) async fn add_worktree(
+    path: String,
+    worktree_path: String,
+    branch: String,
+    create_new_branch: bool,
+) -> Result<Vec<GitWorktreeEntry>, String> {
+    run_blocking(move || {
+        let repository = git::open_repo(&path)?;
+        git::add_worktree(&repository, &worktree_path, &branch, create_new_branch)
+    })
+    .await
+}
+
+#[tauri::command]
+pub(crate) async fn remove_worktree(
+    path: String,
+    worktree_path: String,
+) -> Result<Vec<GitWorktreeEntry>, String> {
+    run_blocking(move || {
+        let repository = git::open_repo(&path)?;
+        git::remove_worktree(&repository, &worktree_path)
+    })
+    .await
+}
+
+#[tauri::command]
+pub(crate) async fn prune_worktrees(path: String) -> Result<Vec<GitWorktreeEntry>, String> {
+    run_blocking(move || {
+        let repository = git::open_repo(&path)?;
+        git::prune_worktrees(&repository)
     })
     .await
 }

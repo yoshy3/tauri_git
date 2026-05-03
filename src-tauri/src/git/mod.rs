@@ -19,6 +19,7 @@ use std::process::{Command, Stdio};
 
 mod branches;
 mod diff;
+mod git_worktrees;
 mod history;
 mod refs;
 mod remotes;
@@ -48,6 +49,9 @@ use remotes::has_remote;
 pub(crate) use repository::open_repo;
 use repository::{repository_root, tree_is_unchanged};
 pub(crate) use status::build_repository_status;
+pub(crate) use git_worktrees::{
+    add_worktree, list_worktrees, prune_worktrees, remove_worktree,
+};
 pub(crate) use worktree::{
     apply_stash_entry, create_commit, create_stash, discard_selected_changes, pop_stash_entry,
 };

@@ -196,7 +196,32 @@
     "tagsEmpty": "No tags to display.",
     "stashesEmpty": "No stashes.",
     "submodulesEmpty": "No submodules.",
-    "matchingBranchesEmpty": "No matching branches."
+    "matchingBranchesEmpty": "No matching branches.",
+    "worktrees": "Worktrees",
+    "newWorktree": "New Worktree",
+    "worktreeMain": "main",
+    "removeWorktree": "Remove worktree",
+    "worktreesEmpty": "No linked worktrees."
+  },
+  "worktreeDialog": {
+    "title": "Add Worktree",
+    "description": "Create a new linked worktree at the specified path.",
+    "pathLabel": "Worktree Path",
+    "pathPlaceholder": "/path/to/worktree",
+    "branchLabel": "Branch",
+    "branchPlaceholder": "branch-name",
+    "createNewBranch": "Create a new branch",
+    "cancel": "Cancel",
+    "add": "Add Worktree",
+    "adding": "Adding..."
+  },
+  "worktreeRemoveDialog": {
+    "title": "Remove Worktree",
+    "description": "Remove this linked worktree. The directory and its contents will be deleted.",
+    "targetLabel": "Worktree path",
+    "cancel": "Cancel",
+    "remove": "Remove",
+    "removing": "Removing..."
   },
   "history": {
     "searchPlaceholder": "Search commits...",

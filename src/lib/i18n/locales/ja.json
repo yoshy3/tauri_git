@@ -196,7 +196,32 @@
     "tagsEmpty": "表示できるタグがありません。",
     "stashesEmpty": "Stash はありません。",
     "submodulesEmpty": "Submodule はありません。",
-    "matchingBranchesEmpty": "一致するブランチがありません。"
+    "matchingBranchesEmpty": "一致するブランチがありません。",
+    "worktrees": "ワークツリー",
+    "newWorktree": "ワークツリーを追加",
+    "worktreeMain": "メイン",
+    "removeWorktree": "ワークツリーを削除",
+    "worktreesEmpty": "リンクされたワークツリーはありません。"
+  },
+  "worktreeDialog": {
+    "title": "ワークツリーを追加",
+    "description": "指定したパスに新しいリンクワークツリーを作成します。",
+    "pathLabel": "ワークツリーのパス",
+    "pathPlaceholder": "/path/to/worktree",
+    "branchLabel": "ブランチ",
+    "branchPlaceholder": "branch-name",
+    "createNewBranch": "新しいブランチを作成する",
+    "cancel": "キャンセル",
+    "add": "ワークツリーを追加",
+    "adding": "追加中..."
+  },
+  "worktreeRemoveDialog": {
+    "title": "ワークツリーを削除",
+    "description": "このリンクワークツリーを削除します。ディレクトリとその内容が削除されます。",
+    "targetLabel": "ワークツリーのパス",
+    "cancel": "キャンセル",
+    "remove": "削除する",
+    "removing": "削除中..."
   },
   "history": {
     "searchPlaceholder": "コミットを検索...",

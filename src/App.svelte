@@ -62,6 +62,14 @@
   let pushDialogOpen = false;
   let pendingPushAction = null;
   let pushForceWithLease = false;
+  let worktrees = [];
+  let worktreeDialogOpen = false;
+  let worktreePathDraft = "";
+  let worktreeBranchDraft = "";
+  let worktreeCreateNewBranch = false;
+  let worktreeBusy = false;
+  let removeWorktreeDialogOpen = false;
+  let removeWorktreeTarget = null;
   let theme = "dark";
   let leftPaneWidth = 246;
   let rightPaneWidth = 332;
@@ -138,7 +146,9 @@
       deleteDialogOpen ||
       deleteTagDialogOpen ||
       discardDialogOpen ||
-      pushDialogOpen
+      pushDialogOpen ||
+      worktreeDialogOpen ||
+      removeWorktreeDialogOpen
     );
   }
 
@@ -417,6 +427,7 @@
         rememberRepositoryPath(repository.repo_path);
       }
       void loadCommitHistory(repository.repo_path);
+      void loadWorktrees();
     } catch (message) {
       if (remember || clearSavedOnError) {
         forgetRepositoryPath(trimmed);
@@ -1682,6 +1693,101 @@
     selectedCommitDetailLoading = false;
   }
 
+  async function loadWorktrees() {
+    if (!repository) {
+      return;
+    }
+
+    try {
+      worktrees = await invoke("list_worktrees", { path: repository.repo_path });
+    } catch (_message) {
+      // Non-critical; leave worktrees as-is
+    }
+  }
+
+  function resetWorktreeDialog() {
+    worktreeDialogOpen = false;
+    worktreePathDraft = "";
+    worktreeBranchDraft = "";
+    worktreeCreateNewBranch = false;
+  }
+
+  function resetRemoveWorktreeDialog() {
+    removeWorktreeDialogOpen = false;
+    removeWorktreeTarget = null;
+  }
+
+  function openAddWorktreeDialog() {
+    if (!repository) {
+      error = t("errors.openRepositoryFirst");
+      return;
+    }
+
+    worktreePathDraft = "";
+    worktreeBranchDraft = "";
+    worktreeCreateNewBranch = false;
+    worktreeDialogOpen = true;
+    error = "";
+  }
+
+  async function confirmAddWorktree() {
+    if (!repository || !worktreePathDraft.trim() || !worktreeBranchDraft.trim()) {
+      return;
+    }
+
+    worktreeBusy = true;
+    error = "";
+
+    try {
+      worktrees = await invoke("add_worktree", {
+        path: repository.repo_path,
+        worktreePath: worktreePathDraft.trim(),
+        branch: worktreeBranchDraft.trim(),
+        createNewBranch: worktreeCreateNewBranch,
+      });
+      resetWorktreeDialog();
+    } catch (message) {
+      error = String(message);
+    } finally {
+      worktreeBusy = false;
+    }
+  }
+
+  function openRemoveWorktreeDialog(worktree) {
+    if (!repository || worktree.is_main) {
+      return;
+    }
+
+    removeWorktreeTarget = worktree;
+    removeWorktreeDialogOpen = true;
+    error = "";
+  }
+
+  async function confirmRemoveWorktree() {
+    if (!repository || !removeWorktreeTarget) {
+      return;
+    }
+
+    worktreeBusy = true;
+    error = "";
+
+    try {
+      worktrees = await invoke("remove_worktree", {
+        path: repository.repo_path,
+        worktreePath: removeWorktreeTarget.path,
+      });
+      resetRemoveWorktreeDialog();
+    } catch (message) {
+      error = String(message);
+    } finally {
+      worktreeBusy = false;
+    }
+  }
+
+  async function openWorktreePath(worktreePath) {
+    await openRepositoryAt(worktreePath);
+  }
+
   async function loadWorktreeCompareDiff(entry) {
     if (!repository || !entry?.path) {
       error = t("errors.openRepositoryFirst");
@@ -1731,6 +1837,8 @@
       selectedStashIndex={selectedStashIndex}
       {selectedRef}
       stashBusyAction={stashBusyAction}
+      {worktrees}
+      currentRepoPath={repository?.repo_path ?? ""}
       onSelectStash={(index) => (selectedStashIndex = index)}
       onSelectTag={selectTag}
       onOpenCreateTagDialog={openCreateTagDialog}
@@ -1744,6 +1852,9 @@
       onCancelSelectedStash={() => (selectedStashIndex = null)}
       onApplySelectedStash={applySelectedStash}
       onPopSelectedStash={popSelectedStash}
+      onOpenAddWorktreeDialog={openAddWorktreeDialog}
+      onOpenWorktree={openWorktreePath}
+      onOpenRemoveWorktreeDialog={openRemoveWorktreeDialog}
     />
 
     <div
@@ -2071,6 +2182,66 @@
           </button>
           <button class="dialog-button dialog-button-danger" type="button" on:click={confirmDiscardChanges} disabled={discarding}>
             {discarding ? t("discardDialog.discarding") : t("discardDialog.confirm")}
+          </button>
+        </div>
+      </section>
+    </div>
+  {/if}
+
+  {#if worktreeDialogOpen}
+    <div class="dialog-backdrop" role="presentation" on:click={(event) => event.target === event.currentTarget && !worktreeBusy && resetWorktreeDialog()}>
+      <section class="dialog-card" role="dialog" aria-modal="true" aria-labelledby="worktree-add-dialog-title">
+        <div class="dialog-copy">
+          <h2 id="worktree-add-dialog-title">{t("worktreeDialog.title")}</h2>
+          <p>{t("worktreeDialog.description")}</p>
+        </div>
+
+        <label class="dialog-field">
+          <span>{t("worktreeDialog.pathLabel")}</span>
+          <input bind:value={worktreePathDraft} placeholder={t("worktreeDialog.pathPlaceholder")} disabled={worktreeBusy} />
+        </label>
+
+        <label class="dialog-field">
+          <span>{t("worktreeDialog.branchLabel")}</span>
+          <input bind:value={worktreeBranchDraft} placeholder={t("worktreeDialog.branchPlaceholder")} disabled={worktreeBusy} />
+        </label>
+
+        <label class="dialog-checkbox">
+          <input type="checkbox" bind:checked={worktreeCreateNewBranch} disabled={worktreeBusy} />
+          <span>{t("worktreeDialog.createNewBranch")}</span>
+        </label>
+
+        <div class="dialog-actions">
+          <button class="dialog-button dialog-button-muted" type="button" on:click={resetWorktreeDialog} disabled={worktreeBusy}>
+            {t("worktreeDialog.cancel")}
+          </button>
+          <button class="dialog-button" type="button" on:click={confirmAddWorktree} disabled={worktreeBusy || !worktreePathDraft.trim() || !worktreeBranchDraft.trim()}>
+            {worktreeBusy ? t("worktreeDialog.adding") : t("worktreeDialog.add")}
+          </button>
+        </div>
+      </section>
+    </div>
+  {/if}
+
+  {#if removeWorktreeDialogOpen && removeWorktreeTarget}
+    <div class="dialog-backdrop" role="presentation" on:click={(event) => event.target === event.currentTarget && !worktreeBusy && resetRemoveWorktreeDialog()}>
+      <section class="dialog-card" role="dialog" aria-modal="true" aria-labelledby="worktree-remove-dialog-title">
+        <div class="dialog-copy">
+          <h2 id="worktree-remove-dialog-title">{t("worktreeRemoveDialog.title")}</h2>
+          <p>{t("worktreeRemoveDialog.description")}</p>
+        </div>
+
+        <div class="dialog-warning">
+          <span class="dialog-warning-label">{t("worktreeRemoveDialog.targetLabel")}</span>
+          <code>{removeWorktreeTarget.path}</code>
+        </div>
+
+        <div class="dialog-actions">
+          <button class="dialog-button dialog-button-muted" type="button" on:click={resetRemoveWorktreeDialog} disabled={worktreeBusy}>
+            {t("worktreeRemoveDialog.cancel")}
+          </button>
+          <button class="dialog-button dialog-button-danger" type="button" on:click={confirmRemoveWorktree} disabled={worktreeBusy}>
+            {worktreeBusy ? t("worktreeRemoveDialog.removing") : t("worktreeRemoveDialog.remove")}
           </button>
         </div>
       </section>

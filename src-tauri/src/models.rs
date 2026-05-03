@@ -126,3 +126,13 @@ pub(crate) struct GitWorktreeFileDiff {
     pub(crate) path: String,
     pub(crate) patch: String,
 }
+
+#[derive(Serialize)]
+pub(crate) struct GitWorktreeEntry {
+    pub(crate) path: String,
+    pub(crate) branch: Option<String>,
+    pub(crate) head_oid: Option<String>,
+    pub(crate) is_main: bool,
+    pub(crate) is_locked: bool,
+    pub(crate) is_prunable: bool,
+}
