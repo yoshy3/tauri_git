@@ -21,6 +21,7 @@ Tauri Git is a desktop Git client focused on a compact workflow:
 - Browse tags and jump from a tag to its commit in history
 - Checkout, create, rebase, reset, and delete branches
 - Revert a commit with an editable revert commit message
+- Manage linked worktrees: list, add, and remove; double-click to switch
 
 ## Screenshot
 
@@ -71,6 +72,10 @@ Tauri Git is a desktop Git client focused on a compact workflow:
 - Remote branch deletion support
 - Safe delete confirmation with branch-name input
 - Optional force delete for unmerged local branches
+- Linked worktree management: list all worktrees, add a new worktree at a specified path and branch, remove a linked worktree
+- Worktrees section pinned to the top of the sidebar, expanded by default
+- Double-click any worktree (including main) to switch to it
+- Active worktree highlighted with an accent left border, bold name, and colored branch label
 - English / Japanese UI switching
 - Dark / light theme switching with saved preference
 - Draggable left / center / right pane widths
