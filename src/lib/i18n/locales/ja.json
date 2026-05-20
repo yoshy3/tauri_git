@@ -126,6 +126,15 @@
     "reverting": "取り消し中...",
     "cancel": "キャンセル"
   },
+  "branchRename": {
+    "title": "ブランチ名を変更",
+    "description": "ローカルブランチ {branch} の名前を変更します。",
+    "targetLabel": "現在の名前",
+    "inputLabel": "新しいブランチ名",
+    "rename": "名前を変更",
+    "renaming": "変更中...",
+    "cancel": "キャンセル"
+  },
   "branchDelete": {
     "title": "ブランチを削除",
     "description": "{branch} を削除します。確認のため、下に完全なブランチ名を入力してください。",
@@ -182,6 +191,7 @@
     "tagActions": "タグ操作",
     "checkout": "Checkout",
     "newBranch": "新規ブランチ",
+    "renameBranch": "名前を変更",
     "rebase": "このブランチへ rebase",
     "newTag": "新規タグ",
     "deleteTag": "タグ削除",

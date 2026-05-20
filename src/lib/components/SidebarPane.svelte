@@ -17,6 +17,7 @@
   export let onCreateBranchFromReference = () => {};
   export let onRebaseReference = () => {};
   export let onDeleteReference = () => {};
+  export let onRenameReference = () => {};
   export let onCancelSelectedStash = () => {};
   export let onApplySelectedStash = () => {};
   export let onPopSelectedStash = () => {};
@@ -300,6 +301,7 @@
                   {onCreateBranchFromReference}
                   {onRebaseReference}
                   {onDeleteReference}
+                  {onRenameReference}
                 />
               {/key}
             </div>
@@ -348,6 +350,7 @@
                             {onCreateBranchFromReference}
                             {onRebaseReference}
                             {onDeleteReference}
+                            {onRenameReference}
                           />
                         {/key}
                       </div>

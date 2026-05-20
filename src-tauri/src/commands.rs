@@ -198,6 +198,20 @@ pub(crate) async fn delete_branch(
 }
 
 #[tauri::command]
+pub(crate) async fn rename_branch(
+    path: String,
+    old_name: String,
+    new_name: String,
+) -> Result<GitStatusResponse, String> {
+    run_blocking(move || {
+        let mut repository = git::open_repo(&path)?;
+        git::rename_repository_branch(&repository, &old_name, &new_name)?;
+        git::build_repository_status(&mut repository)
+    })
+    .await
+}
+
+#[tauri::command]
 pub(crate) async fn create_tag(
     path: String,
     tag_name: String,

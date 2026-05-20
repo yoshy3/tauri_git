@@ -1,4 +1,4 @@
-﻿use super::*;
+use super::*;
 
 pub(super) fn load_branch_upstream_sync_counts(
     repository: &Repository,
@@ -435,3 +435,51 @@ pub(crate) fn delete_repository_branch(
 
     Ok(())
 }
+
+pub(crate) fn rename_repository_branch(
+    repository: &Repository,
+    old_name: &str,
+    new_name: &str,
+) -> Result<(), String> {
+    let old_name = old_name.trim();
+    let new_name = new_name.trim();
+    if old_name.is_empty() || new_name.is_empty() {
+        return Err(bilingual(
+            "ブランチ名が空です。",
+            "Branch name is empty.",
+        ));
+    }
+
+    let repo_root = repository_root(repository)?;
+    let mut command = git_command();
+    command
+        .current_dir(repo_root)
+        .arg("branch")
+        .arg("-m")
+        .arg(old_name)
+        .arg(new_name);
+
+    let output = command
+        .output()
+        .map_err(|error| {
+            bilingual_with_detail(
+                "ブランチ名変更コマンドを実行できませんでした",
+                "Failed to run branch rename command",
+                error,
+            )
+        })?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+        let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
+        let detail = command_output_detail(&stderr, &stdout);
+        return Err(bilingual_with_detail(
+            "ブランチ名の変更に失敗しました",
+            "Branch rename failed",
+            detail,
+        ));
+    }
+
+    Ok(())
+}
+

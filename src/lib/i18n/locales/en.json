@@ -126,6 +126,15 @@
     "reverting": "Reverting...",
     "cancel": "Cancel"
   },
+  "branchRename": {
+    "title": "Rename Branch",
+    "description": "Rename the local branch {branch}.",
+    "targetLabel": "Current name",
+    "inputLabel": "New branch name",
+    "rename": "Rename",
+    "renaming": "Renaming...",
+    "cancel": "Cancel"
+  },
   "branchDelete": {
     "title": "Delete Branch",
     "description": "This action will delete {branch}. Type the full branch name below to confirm.",
@@ -182,6 +191,7 @@
     "tagActions": "Tag actions",
     "checkout": "Checkout",
     "newBranch": "New Branch",
+    "renameBranch": "Rename Branch",
     "rebase": "Rebase Onto",
     "newTag": "New Tag",
     "deleteTag": "Delete Tag",

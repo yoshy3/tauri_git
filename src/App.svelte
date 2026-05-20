@@ -69,6 +69,9 @@
   let worktreeCreateNewBranch = false;
   let worktreeBusy = false;
   let removeWorktreeDialogOpen = false;
+  let renameDialogOpen = false;
+  let renameTargetRef = null;
+  let renameBranchNameDraft = "";
   let removeWorktreeTarget = null;
   let theme = "dark";
   let leftPaneWidth = 246;
@@ -148,7 +151,8 @@
       discardDialogOpen ||
       pushDialogOpen ||
       worktreeDialogOpen ||
-      removeWorktreeDialogOpen
+      removeWorktreeDialogOpen ||
+      renameDialogOpen
     );
   }
 
@@ -202,6 +206,12 @@
     deleteTagDialogOpen = false;
     deleteTagNameDraft = "";
     deleteTargetTagName = "";
+  }
+
+  function resetRenameDialog() {
+    renameDialogOpen = false;
+    renameTargetRef = null;
+    renameBranchNameDraft = "";
   }
 
   function resetDiscardDialog() {
@@ -1157,6 +1167,59 @@
     branchDialogOpen = true;
   }
 
+  function openRenameReference(ref) {
+    if (!repository || ref?.kind !== "local_branch") {
+      return;
+    }
+    closeBranchMenu();
+    renameTargetRef = ref;
+    renameBranchNameDraft = ref.name;
+    renameDialogOpen = true;
+    error = "";
+  }
+
+  async function confirmRenameReference() {
+    if (!repository || !renameTargetRef || renameTargetRef.kind !== "local_branch") {
+      return;
+    }
+
+    const newName = renameBranchNameDraft.trim();
+    if (!newName) {
+      error = t("errors.branchNameEmpty");
+      return;
+    }
+
+    if (newName === renameTargetRef.name) {
+      resetRenameDialog();
+      return;
+    }
+
+    loading = true;
+    error = "";
+
+    try {
+      repository = await invoke("rename_branch", {
+        path: repository.repo_path,
+        oldName: renameTargetRef.name,
+        newName: newName,
+      });
+      if (selectedRef?.key === renameTargetRef.key) {
+        selectedRef = {
+          ...selectedRef,
+          name: newName,
+          displayName: newName,
+          key: `local:${newName}`,
+        };
+      }
+      resetRenameDialog();
+      void loadCommitHistory(repository.repo_path);
+    } catch (message) {
+      error = String(message);
+    } finally {
+      loading = false;
+    }
+  }
+
   function openRebaseDialog(ref = selectedRef) {
     if (!repository) {
       error = t("errors.openRepositoryFirst");
@@ -1849,6 +1912,7 @@
       onCreateBranchFromReference={openCreateBranchDialog}
       onRebaseReference={openRebaseDialog}
       onDeleteReference={deleteReference}
+      onRenameReference={openRenameReference}
       onCancelSelectedStash={() => (selectedStashIndex = null)}
       onApplySelectedStash={applySelectedStash}
       onPopSelectedStash={popSelectedStash}
@@ -2155,6 +2219,41 @@
             disabled={loading || deleteTagNameDraft.trim() !== deleteTargetTagName}
           >
             {loading ? t("tagDelete.deleting") : t("tagDelete.delete")}
+          </button>
+        </div>
+      </section>
+    </div>
+  {/if}
+
+  {#if renameDialogOpen && renameTargetRef}
+    <div class="dialog-backdrop" role="presentation" on:click={(event) => event.target === event.currentTarget && !loading && resetRenameDialog()}>
+      <section class="dialog-card" role="dialog" aria-modal="true" aria-labelledby="rename-dialog-title">
+        <div class="dialog-copy">
+          <h2 id="rename-dialog-title">{t("branchRename.title")}</h2>
+          <p>{t("branchRename.description", { branch: renameTargetRef.displayName })}</p>
+        </div>
+
+        <div class="dialog-warning">
+          <span class="dialog-warning-label">{t("branchRename.targetLabel")}</span>
+          <code>{renameTargetRef.displayName}</code>
+        </div>
+
+        <label class="dialog-field">
+          <span>{t("branchRename.inputLabel")}</span>
+          <input bind:value={renameBranchNameDraft} placeholder={renameTargetRef.name} disabled={loading} />
+        </label>
+
+        <div class="dialog-actions">
+          <button class="dialog-button dialog-button-muted" type="button" on:click={resetRenameDialog} disabled={loading}>
+            {t("branchRename.cancel")}
+          </button>
+          <button
+            class="dialog-button"
+            type="button"
+            on:click={confirmRenameReference}
+            disabled={loading || !renameBranchNameDraft.trim() || renameBranchNameDraft.trim() === renameTargetRef.name}
+          >
+            {loading ? t("branchRename.renaming") : t("branchRename.rename")}
           </button>
         </div>
       </section>
