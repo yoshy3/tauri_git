@@ -223,22 +223,6 @@
     }
   }
 
-  function dedupeLaneEntries(entries) {
-    const seen = new Set();
-    const result = [];
-
-    entries.forEach((entry) => {
-      if (seen.has(entry.oid)) {
-        return;
-      }
-
-      seen.add(entry.oid);
-      result.push(entry);
-    });
-
-    return result;
-  }
-
   function buildVerticalPath(x, startY, endY) {
     return `M ${x} ${startY} L ${x} ${endY}`;
   }
@@ -273,6 +257,10 @@
       return color;
     }
 
+    function findLaneIndex(entries, oid, excludeIndex = -1) {
+      return entries.findIndex((lane, index) => index !== excludeIndex && lane.oid === oid);
+    }
+
     commits.forEach((commit, rowIndex) => {
       const existingIndex = lanes.findIndex((lane) => lane.oid === commit.oid);
       const inserted = existingIndex === -1;
@@ -286,19 +274,34 @@
       if (commit.parent_ids.length === 0) {
         after.splice(laneIndex, 1);
       } else {
-        after[laneIndex] = { oid: commit.parent_ids[0], color: nodeLane.color };
+        const firstParentId = commit.parent_ids[0];
+        const firstParentLaneIndex = findLaneIndex(after, firstParentId, laneIndex);
+
+        if (firstParentLaneIndex === -1) {
+          after[laneIndex] = { oid: firstParentId, color: nodeLane.color };
+        } else {
+          after.splice(laneIndex, 1);
+        }
+
+        let insertionIndex = Math.min(laneIndex + 1, after.length);
         for (let index = 1; index < commit.parent_ids.length; index += 1) {
           const parentId = commit.parent_ids[index];
+          const existingParentLaneIndex = findLaneIndex(after, parentId);
+
+          if (existingParentLaneIndex !== -1) {
+            continue;
+          }
+
           const existingParentLane = before.find((lane) => lane.oid === parentId);
-          after.splice(laneIndex + index, 0, {
+          after.splice(insertionIndex, 0, {
             oid: parentId,
             color: existingParentLane?.color ?? nextColor(),
           });
+          insertionIndex += 1;
         }
       }
 
-      const dedupedAfter = dedupeLaneEntries(after);
-      const laneCount = Math.max(before.length, dedupedAfter.length, 1);
+      const laneCount = Math.max(before.length, after.length, 1);
       maxLaneCount = Math.max(maxLaneCount, laneCount);
       const lines = [];
       const topY = -graphOverlap;
@@ -313,15 +316,7 @@
 
         const currentX = graphPadding + index * graphLaneSpacing;
         const stroke = lane.color;
-        if (commit.parent_ids.includes(lane.oid)) {
-          lines.push({
-            d: buildLaneTransitionPath(currentX, topY, nodeX, graphCenterY),
-            stroke,
-          });
-          return;
-        }
-
-        const nextIndex = dedupedAfter.findIndex((nextLane) => nextLane.oid === lane.oid);
+        const nextIndex = after.findIndex((nextLane) => nextLane.oid === lane.oid);
 
         if (nextIndex === -1) {
           lines.push({
@@ -346,12 +341,12 @@
       }
 
       commit.parent_ids.forEach((parentId) => {
-        const nextIndex = dedupedAfter.findIndex((lane) => lane.oid === parentId);
+        const nextIndex = after.findIndex((lane) => lane.oid === parentId);
         if (nextIndex === -1) {
           return;
         }
         const nextX = graphPadding + nextIndex * graphLaneSpacing;
-        const nextLaneColor = dedupedAfter[nextIndex].color;
+        const nextLaneColor = parentId === commit.parent_ids[0] ? nodeColor : after[nextIndex].color;
         lines.push({
           d:
             nextX === nodeX
@@ -361,7 +356,7 @@
         });
       });
 
-      lanes = dedupedAfter;
+      lanes = after;
 
       rows.push({
         ...commit,
