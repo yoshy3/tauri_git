@@ -80,6 +80,10 @@
   let resizeCleanup = null;
   let viewportWidth = 0;
   let recentRepositoryPaths = [];
+  let updateDialogOpen = false;
+  let latestUpdate = null;
+  let updateChecking = false;
+  let updateInstalling = false;
 
   const topActions = ["Fetch", "Pull", "Push", "Stash", "Discard"];
   const implementedTopActions = ["Fetch", "Pull", "Push", "Stash", "Discard"];
@@ -87,6 +91,7 @@
   const repositoryHistoryKey = "tauri-git:repository-history";
   const themeStorageKey = "tauri-git:theme";
   const paneLayoutStorageKey = "tauri-git:pane-layout";
+  const skippedUpdateVersionKey = "tauri-git:skipped-update-version";
   const maxRecentRepositories = 10;
   const historyBatchSize = 100;
   const autoRefreshIntervalMs = 2500;
@@ -152,7 +157,9 @@
       pushDialogOpen ||
       worktreeDialogOpen ||
       removeWorktreeDialogOpen ||
-      renameDialogOpen
+      renameDialogOpen ||
+      updateDialogOpen ||
+      updateInstalling
     );
   }
 
@@ -1587,6 +1594,86 @@
     }
   }
 
+  async function checkForReleaseUpdate() {
+    if (updateChecking) {
+      return;
+    }
+
+    updateChecking = true;
+    try {
+      const update = await invoke("check_latest_release");
+      if (!update) {
+        return;
+      }
+
+      const skippedVersion = localStorage.getItem(skippedUpdateVersionKey);
+      if (skippedVersion === update.version) {
+        return;
+      }
+
+      latestUpdate = update;
+      updateDialogOpen = true;
+    } catch (message) {
+      console.warn("Update check failed", message);
+    } finally {
+      updateChecking = false;
+    }
+  }
+
+  function resetUpdateDialog() {
+    updateDialogOpen = false;
+    latestUpdate = null;
+  }
+
+  async function installReleaseUpdate(update) {
+    if (!update || updateInstalling) {
+      return false;
+    }
+
+    updateInstalling = true;
+    error = "";
+    try {
+      await invoke("install_release_update", { update });
+      return true;
+    } catch (message) {
+      error = String(message);
+      return false;
+    } finally {
+      updateInstalling = false;
+    }
+  }
+
+  async function installUpdateNow() {
+    const update = latestUpdate;
+    if (await installReleaseUpdate(update)) {
+      resetUpdateDialog();
+    }
+  }
+
+  async function installUpdateOnExit() {
+    if (!latestUpdate || updateInstalling) {
+      return;
+    }
+
+    updateInstalling = true;
+    error = "";
+    try {
+      await invoke("download_release_update_on_exit", { update: latestUpdate });
+      resetUpdateDialog();
+    } catch (message) {
+      error = String(message);
+    } finally {
+      updateInstalling = false;
+    }
+  }
+
+  function skipUpdateVersion() {
+    if (latestUpdate?.version) {
+      localStorage.setItem(skippedUpdateVersionKey, latestUpdate.version);
+    }
+    resetUpdateDialog();
+  }
+
   onMount(() => {
     applyTheme(localStorage.getItem(themeStorageKey) ?? "dark");
     restorePaneLayout();
@@ -1639,6 +1726,7 @@
     document.addEventListener("pointerdown", handleGlobalPointerDown);
     window.addEventListener("focus", handleWindowFocus);
     window.addEventListener("resize", handleResize);
+    void checkForReleaseUpdate();
 
     const savedPath = recentRepositoryPaths[0] ?? localStorage.getItem(lastRepositoryKey);
     if (!savedPath) {
@@ -2347,6 +2435,34 @@
     </div>
   {/if}
 
+  {#if updateDialogOpen && latestUpdate}
+    <div class="dialog-backdrop" role="presentation">
+      <section class="dialog-card dialog-card-wide" role="dialog" aria-modal="true" aria-labelledby="update-dialog-title">
+        <div class="dialog-copy">
+          <h2 id="update-dialog-title">{t("updateDialog.title", { version: latestUpdate.version })}</h2>
+          <p>{t("updateDialog.description", { asset: latestUpdate.asset.name })}</p>
+        </div>
+
+        <div class="dialog-warning dialog-info">
+          <span class="dialog-warning-label">{t("updateDialog.releaseLabel")}</span>
+          <code>{latestUpdate.tag_name} - {latestUpdate.release_name || latestUpdate.html_url}</code>
+        </div>
+
+        <div class="dialog-actions dialog-actions-stacked">
+          <button class="dialog-button" type="button" on:click={installUpdateNow} disabled={updateInstalling}>
+            {updateInstalling ? t("updateDialog.installing") : t("updateDialog.installNow")}
+          </button>
+          <button class="dialog-button dialog-button-muted" type="button" on:click={installUpdateOnExit} disabled={updateInstalling}>
+            {t("updateDialog.installOnExit")}
+          </button>
+          <button class="dialog-button dialog-button-muted" type="button" on:click={skipUpdateVersion} disabled={updateInstalling}>
+            {t("updateDialog.skip")}
+          </button>
+        </div>
+      </section>
+    </div>
+  {/if}
+
   {#if pushDialogOpen && repository}
     <div
       class="dialog-backdrop"
@@ -2472,6 +2588,10 @@
     box-shadow: var(--dialog-shadow);
   }
 
+  .dialog-card-wide {
+    width: min(100%, 520px);
+  }
+
   .dialog-copy h2 {
     margin: 0;
     color: var(--text-primary);
@@ -2588,6 +2708,11 @@
     gap: 8px;
   }
 
+  .dialog-actions-stacked {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
   .dialog-warning {
     display: grid;
     gap: 4px;
@@ -2595,6 +2720,11 @@
     border-radius: 10px;
     background: var(--danger-soft);
     border: 1px solid var(--danger-border);
+  }
+
+  .dialog-info {
+    background: color-mix(in srgb, var(--accent) 10%, var(--surface-background));
+    border-color: color-mix(in srgb, var(--accent) 35%, var(--surface-border));
   }
 
   .dialog-warning-label,

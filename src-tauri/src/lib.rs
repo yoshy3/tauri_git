@@ -2,6 +2,7 @@ mod app;
 mod commands;
 mod git;
 mod models;
+mod update;
 
 pub fn run() {
     let state_flags = app::window_state_flags();
@@ -14,6 +15,11 @@ pub fn run() {
                 .build(),
         )
         .setup(app::setup_main_window)
+        .on_window_event(|_window, event| {
+            if matches!(event, tauri::WindowEvent::CloseRequested { .. }) {
+                update::run_pending_exit_installer();
+            }
+        })
         .invoke_handler(tauri::generate_handler![
             commands::open_repository,
             commands::get_repository_status,
@@ -42,7 +48,10 @@ pub fn run() {
             commands::list_worktrees,
             commands::add_worktree,
             commands::remove_worktree,
-            commands::prune_worktrees
+            commands::prune_worktrees,
+            commands::check_latest_release,
+            commands::install_release_update,
+            commands::download_release_update_on_exit
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -233,6 +233,15 @@
     "remove": "Remove",
     "removing": "Removing..."
   },
+  "updateDialog": {
+    "title": "Version {version} is available",
+    "description": "Download {asset} from the GitHub Release page and run the installer.",
+    "releaseLabel": "Release",
+    "installNow": "Update Now",
+    "installOnExit": "Update When Exiting",
+    "skip": "Do Not Update",
+    "installing": "Starting Update..."
+  },
   "history": {
     "searchPlaceholder": "Search commits...",
     "loading": "loading...",

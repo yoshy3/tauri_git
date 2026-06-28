@@ -3,6 +3,7 @@ use crate::models::{
     GitCommitDetail, GitCommitHistoryChunk, GitReferenceTarget, GitStatusResponse,
     GitWorktreeEntry, GitWorktreeFileDiff,
 };
+use crate::update::UpdateInfo;
 
 async fn run_blocking<T, F>(job: F) -> Result<T, String>
 where
@@ -398,4 +399,25 @@ pub(crate) async fn prune_worktrees(path: String) -> Result<Vec<GitWorktreeEntry
         git::prune_worktrees(&repository)
     })
     .await
+}
+
+#[tauri::command]
+pub(crate) async fn check_latest_release() -> Result<Option<UpdateInfo>, String> {
+    crate::update::check_latest_release().await
+}
+
+#[tauri::command]
+pub(crate) async fn install_release_update(
+    app_handle: tauri::AppHandle,
+    update: UpdateInfo,
+) -> Result<(), String> {
+    crate::update::download_and_run_installer(app_handle, update).await
+}
+
+#[tauri::command]
+pub(crate) async fn download_release_update_on_exit(
+    app_handle: tauri::AppHandle,
+    update: UpdateInfo,
+) -> Result<(), String> {
+    crate::update::download_installer_for_exit(app_handle, update).await
 }

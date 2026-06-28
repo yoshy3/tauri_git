@@ -233,6 +233,15 @@
     "remove": "削除する",
     "removing": "削除中..."
   },
+  "updateDialog": {
+    "title": "バージョン {version} が利用できます",
+    "description": "GitHub Release から {asset} をダウンロードしてインストーラを起動します。",
+    "releaseLabel": "Release",
+    "installNow": "今すぐバージョンアップ",
+    "installOnExit": "プログラム終了時にバージョンアップ",
+    "skip": "バージョンアップしない",
+    "installing": "バージョンアップを開始しています..."
+  },
   "history": {
     "searchPlaceholder": "コミットを検索...",
     "loading": "読み込み中...",
