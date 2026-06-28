@@ -401,7 +401,7 @@
   }
 
   .branch-folder-children {
-    margin-left: 8px;
+    margin-left: var(--tree-indent-width, 12px);
   }
 
   .tree-chevron {

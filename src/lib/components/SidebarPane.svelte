@@ -594,6 +594,7 @@
   }
 
   .sidebar-tree {
+    --tree-indent-width: 12px;
     min-height: 0;
     overflow-y: auto;
     overflow-x: hidden;
@@ -706,11 +707,11 @@
 
   .tree-section-children,
   .tree-nested-list {
-    margin-left: 12px;
+    margin-left: var(--tree-indent-width);
   }
 
   .tree-branch-root {
-    margin-left: 0;
+    margin-left: var(--tree-indent-width);
   }
 
   .tree-group-details > summary {
